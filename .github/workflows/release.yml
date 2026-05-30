@@ -42,10 +42,10 @@ jobs:
   pack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -92,7 +92,7 @@ jobs:
           --package-version "${{ steps.ver.outputs.version }}"
           --engine-version "${{ steps.engine.outputs.engine }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
           path: |
@@ -111,12 +111,12 @@ jobs:
       contents: read
     steps:
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
       - name: Download packed artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nuget-packages
           path: artifacts
