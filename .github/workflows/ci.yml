@@ -47,10 +47,10 @@ jobs:
           - os: windows-latest
             rid: win-x64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -63,10 +63,10 @@ jobs:
   pack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -75,7 +75,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: dotnet run --project cake/LadybugDB.Build.csproj -- --target Pack
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: nuget-packages
           path: |
