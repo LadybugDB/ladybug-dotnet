@@ -3,9 +3,9 @@
 Current state, how to build/test, and immediate next steps. Keep this current whenever work pauses.
 
 ## Current state
-- Now a standalone repo: `sergey-v9/ladybug-dotnet` (temporary home; intended to move to the LadybugDB
-  org). Developed as the `tools/csharp_api` submodule of `LadybugDB/ladybug` (mirrors `tools/rust_api`,
-  `tools/java_api`). The submodule is currently wired in the monorepo LOCALLY ONLY (not pushed upstream).
+- Standalone repo in the LadybugDB org: `LadybugDB/ladybug-dotnet`. Developed as the `tools/csharp_api`
+  submodule of `LadybugDB/ladybug` (mirrors `tools/rust_api`, `tools/java_api`). The submodule is wired
+  in the monorepo LOCALLY ONLY here (the monorepo gitlink is not pushed upstream yet).
 - Phases 0-3 implemented. The solution builds for BOTH target frameworks (`net10.0` + `netstandard2.0`),
   and `dotnet pack` produces a valid package.
 - END-TO-END VALIDATED on Windows x64: native `lbug_shared.dll` built locally with MSVC + Ninja and
@@ -94,9 +94,11 @@ tools/csharp_api/
 
 ## CI / CD (GitHub Actions, in the standalone repo)
 Two workflows at the repo root. They do NOT build the engine - natives come from upstream releases.
-- `.github/workflows/ci.yml` - PR/push validation. Builds both TFMs, runs the managed + ABI suite
-  (native round-trips skip without a native lib), and a `dotnet pack` smoke check. Path-filtered to
-  `src/**`, `test/**`, `**/*.props`, `LadybugDB.slnx`.
+- `.github/workflows/ci.yml` - PR/push validation. The `build-test` job builds both TFMs, runs the
+  managed + ABI suite (native round-trips skip without a native lib), and a `dotnet pack` smoke check.
+  A `native-test` matrix (linux-x64 + win-x64) then downloads the prebuilt `liblbug-*` for `ENGINE_VERSION`
+  from `LadybugDB/ladybug`, stages it, and re-runs the suite with `LADYBUG_REQUIRE_NATIVE=1` (no skips).
+  Path-filtered to `src/**`, `test/**`, `**/*.props`, `LadybugDB.slnx`.
 - `.github/workflows/release.yml` - the release pipeline. Two jobs:
   1. `pack`: `gh release download "$ENGINE_VERSION" --repo LadybugDB/ladybug` pulls the prebuilt
      `liblbug-*` assets for all 5 RIDs, `cp -L`s each into `lib/runtimes/<rid>/native/`
@@ -116,21 +118,22 @@ git push origin v0.1.0
 `workflow_dispatch` (with a `version` input) builds + packs + uploads the artifact WITHOUT publishing -
 use it to dry-run the multi-RID build before tagging.
 
-### One-time setup before the first publish (USER ACTION)
+### One-time setup before the first publish (MAINTAINER ACTION)
 - nuget.org -> Account -> Trusted Publishing -> Add policy:
-  owner=`sergey-v9`, repo=`ladybug-dotnet`, workflow file=`release.yml`, environment=`release`.
-- Repo Settings -> Environments -> `release`: add secret `NUGET_USER` = your nuget.org PROFILE name
-  (not email). Optionally add required reviewers as an approval gate.
-- The official `LadybugDB` package id requires ownership; from a personal repo treat the publish as a
-  dry run until the repo/package id move to the LadybugDB org (then re-point the policy + RepositoryUrl).
+  owner=`LadybugDB`, repo=`ladybug-dotnet`, workflow file=`release.yml`, environment=`release`.
+- Repo Settings -> Environments -> `release`: add secret `NUGET_USER` = the nuget.org PROFILE name
+  (not email) that owns/co-owns the package id. Optionally add required reviewers as an approval gate.
+- The `LadybugDB` package id must be owned (or reserved) by that nuget.org account before the first real
+  push; until then, use `workflow_dispatch` / local `dotnet pack` as a dry run.
 - Before the first real publish, dry-run: `dotnet pack -c Release -o ./artifacts` (or the dispatch run).
 
 ## Next steps
-1. Confirm `LadybugDB/ladybug` has a release carrying the `liblbug-*` assets and set `ENGINE_VERSION`
-   to it, then run `release.yml` via `workflow_dispatch` once to confirm the multi-RID natives download,
-   the package assembles, and the linux-x64 gate passes (proven on win-x64 locally so far).
+1. Confirm the pinned `ENGINE_VERSION` (`v0.17.0`) release of `LadybugDB/ladybug` actually carries the
+   `liblbug-*` assets for all 5 RIDs, then run `release.yml` via `workflow_dispatch` once to confirm the
+   multi-RID natives download, the package assembles, and the linux-x64 gate passes (proven on win-x64
+   locally; the new `ci.yml` native matrix now also exercises linux-x64 + win-x64 on every push).
 2. Complete the nuget.org trusted-publishing policy + `release` environment, then tag `v*`.
-3. If/when maintainers adopt it: transfer the repo to the LadybugDB org, repoint `.gitmodules` upstream,
-   and update the trusted-publishing policy + `RepositoryUrl`.
+3. Reserve/own the `LadybugDB` package id on nuget.org under the publishing account (the repo already
+   lives in the LadybugDB org).
 4. Phase 3 (remaining): expand the suite to mirror the Java + C API tests over `dataset/tinysnb`.
 5. Phase 5 (optional): Native AOT validation, Arrow C Data interface, observability.

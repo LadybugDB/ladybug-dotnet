@@ -12,7 +12,7 @@
     <PackageTags>graph;graph-database;database;cypher;embedded;ladybug;olap;analytics</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/ladybugdb/ladybug</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/sergey-v9/ladybug-dotnet</RepositoryUrl>
+    <RepositoryUrl>https://github.com/LadybugDB/ladybug-dotnet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
