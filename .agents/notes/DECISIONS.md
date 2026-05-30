@@ -131,8 +131,66 @@ Keep this updated whenever a decision is made.
   The submodule `origin` and the monorepo `.gitmodules` URL were repointed to it; the trusted-publishing
   policy owner is now `LadybugDB` and `RepositoryUrl` points at the org repo.
 - `ci.yml` gained a `native-test` matrix (linux-x64 + win-x64) that downloads the prebuilt `liblbug-*`
-  for `ENGINE_VERSION` (now pinned to `v0.17.0`) and runs the full suite with `LADYBUG_REQUIRE_NATIVE=1`,
-  so native round-trips run on every push - not only in the release gate.
+  for the pinned engine release and runs the full suite with `LADYBUG_REQUIRE_NATIVE=1`, so native
+  round-trips run on every push - not only in the release gate.
+
+## D18 - Split package family + Cake Frosting build (supersedes D16's single fat package)
+- Packaging changed from one fat `LadybugDB` package (managed + all natives) to a **family**: managed-only
+  `LadybugDB`, one `LadybugDB.Native.<rid>` per RID, and a `LadybugDB.Native` meta-package depending on all
+  five. Consumers now reference TWO packages (`LadybugDB` + a native package). This is a deliberate, breaking
+  change to the consumption model: it lets an app pull only the platform(s) it needs (reference a single
+  `LadybugDB.Native.<rid>`) instead of carrying every platform's binary. The managed package has NO
+  dependency on the native packages - that decoupling is exactly what enables the slim, single-RID install.
+- Naming: `LadybugDB.Native` (meta) + `LadybugDB.Native.{win-x64, linux-x64, linux-arm64, osx-x64, osx-arm64}`.
+  Each native package carries only `runtimes/<rid>/native/*` plus an empty `lib/netstandard2.0/_._` marker
+  (so NuGet adds no compile reference) and uses `SuppressDependenciesWhenPacking` (no framework dependency).
+- `nuget/nuget-package.props` no longer globs `lib/runtimes/**` into the managed package; `LadybugDB` is now
+  purely `lib/net10.0` + `lib/netstandard2.0` + README + symbols.
+- Build tool: **Cake Frosting** (not Nuke), as a normal .NET console app under `cake/`
+  (`LadybugDB.Build.csproj`, `BuildContext.cs` which also hosts `Main`, `Tasks/`). The folder is named `cake/` (not
+  the conventional `build/`, which the monorepo root `.gitignore` reserves for build output) so the build
+  tool is obvious. Layout: `cake/` + `cake/common.props` + `cake/native/`. Tasks: Clean, Restore, BuildManaged, Test,
+  FetchNatives, PackManaged, PackRuntimes, PackNativeMeta, VerifyPackages, Pack, Default.
+- Per-RID packaging is ONE parameterized template (`cake/native/LadybugDB.Native.Runtime.csproj`, packed
+  once per RID via `-p:NativeRid/-p:PackageId`) rather than five hand-authored nuspecs. The meta-package IS a
+  nuspec (`cake/native/LadybugDB.Native.nuspec`, a template) because a csproj can't cleanly declare NuGet
+  dependencies on packages that don't exist on a feed yet; version/commit tokens are substituted in C# at
+  pack time (avoids passing semicolon-laden `NuspecProperties` through MSBuild). All packing is `dotnet`-only
+  (no nuget.exe / mono).
+- `BuildContext` is the single source of truth for the RID set and the RID->(release asset, library file)
+  mapping. `EnsureNativeStaged` skips when a native is already staged (e.g. built locally from source),
+  otherwise downloads the pinned engine asset via `gh` and extracts the canonical library (taking the real
+  shared object out of the `.so`/`.dylib` symlink chain, since NuGet doesn't preserve symlinks and the binding
+  loads by path). `VerifyPackages` asserts the managed assemblies, each per-RID payload, and the meta deps.
+- Versioning: all packages take ONE release version from the `v*` tag (`--package-version`); `ENGINE_VERSION`
+  remains the internal pin for WHICH prebuilt natives to fetch, decoupled from the package version. (Alternative
+  - version native packages by engine version - rejected for a simpler single-version family.)
+- Cake gotcha: the host reserves `--version` (prints Cake's own version), so the package version argument is
+  `--package-version`. The orchestrator project must exclude `native/**` from its compile items, or it picks up
+  the native projects' generated `AssemblyInfo.cs` and fails with duplicate-attribute errors.
+- CI/release now invoke the pipeline (`dotnet run --project cake/... -- --target Test|Pack`) instead of inline
+  bash. The release `publish` job pushes all 7 packages via OIDC; the trusted-publishing policy / package-id
+  ownership on nuget.org must now cover every id (`LadybugDB`, `LadybugDB.Native`, and the five
+  `LadybugDB.Native.<rid>`), not just `LadybugDB`.
+
+## D19 - Package version tracks the upstream engine version with an -alpha.N dev suffix
+- All 7 packages share ONE version (per D18). That version's BASE now equals the upstream engine version
+  (`ENGINE_VERSION` without the leading `v`, e.g. `v0.17.0` -> `0.17.0`), so the binding's released
+  version lines up with the engine it wraps. This refines D18's versioning bullet: the family is still
+  uniformly versioned, we just pick the engine version as the base instead of an arbitrary number.
+- While the binding is in development the version carries a prerelease suffix (`alpha.1`, `alpha.2`, ...),
+  so the current default is `0.17.0-alpha.1`. `--prerelease <x>` overrides the suffix, `--prerelease ""`
+  cuts a stable build equal to the engine version, and `--package-version <v>` overrides the whole thing
+  (the release workflow passes the exact version from the `v*` git tag).
+- Single source of truth: the version lives in ONE data file, `version.txt` at the binding root
+  (currently `0.17.0-alpha.1`) - not hardcoded in code or workflows. `BuildContext` reads it (engine
+  release = its base prefixed with `v`, e.g. `v0.17.0`; package version = base + suffix); the managed
+  `nuget-package.props` reads it (via an MSBuild `File.ReadAllText`) for a direct `dotnet pack`; and the
+  CI/release workflows derive from it (the `v*` tag overrides on release). Bumping the alpha (or moving
+  to a new engine) is a one-line edit to `version.txt` - no code or workflow change. This replaced the
+  earlier `DevelopmentPrerelease` C# constant and the `ENGINE_VERSION` workflow env (both removed);
+  `--engine-version` / `ENGINE_VERSION` survive only as optional per-run overrides. The old `0.0.0-dev`
+  / `0.0.1-alpha` placeholders are gone.
 
 ## Open (decide later)
 - Timestamp representation: `DateTime` (UTC) for non-tz precisions vs `DateTimeOffset` for `TIMESTAMP_TZ` (Phase 2).

@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- Shared NuGet metadata for the native runtime packages produced by the build pipeline. -->
+  <PropertyGroup>
+    <Authors>LadybugDB</Authors>
+    <Company>LadybugDB</Company>
+    <Product>Ladybug</Product>
+    <Copyright>Copyright (c) LadybugDB</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ladybugdb/ladybug</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/LadybugDB/ladybug-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageTags>graph;graph-database;database;cypher;embedded;ladybug;native</PackageTags>
+  </PropertyGroup>
+
+</Project>

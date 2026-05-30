@@ -11,6 +11,31 @@ platforms, so you can run Cypher queries against an embedded graph database dire
 - `net10.0` (primary, AOT/trim friendly, source-generated `LibraryImport`)
 - `netstandard2.0` (broad reach, including .NET Framework)
 
+## Installation
+
+The binding is split into a managed package and separate native packages, so an app only carries the
+platform binaries it needs. Reference the managed package **plus** a native package.
+
+For an app that should run on any supported platform, add the native meta-package (it pulls in every
+per-platform native package):
+
+```bash
+dotnet add package LadybugDB
+dotnet add package LadybugDB.Native
+```
+
+For a slim, single-platform app, reference just the native package for that platform instead of the
+meta-package:
+
+```bash
+dotnet add package LadybugDB
+dotnet add package LadybugDB.Native.win-x64
+```
+
+Available native packages: `LadybugDB.Native.win-x64`, `LadybugDB.Native.linux-x64`,
+`LadybugDB.Native.linux-arm64`, `LadybugDB.Native.osx-x64`, `LadybugDB.Native.osx-arm64`. The
+`LadybugDB.Native` meta-package depends on all of them.
+
 ## Quick start
 
 ```csharp
@@ -40,16 +65,30 @@ The binding needs the native Ladybug shared library at runtime (`lbug_shared.dll
 `liblbug.so` / `liblbug.dylib`). When the native library is not available, the native round-trip
 tests skip (the ABI/struct-layout guards still run).
 
-## How the native library is obtained
+## How the packages are built
 
-This repo does not contain the engine source; the native library comes from the upstream
-[Ladybug](https://github.com/ladybugdb/ladybug) engine:
+This repo does not contain the engine source; the native libraries come from the upstream
+[Ladybug](https://github.com/ladybugdb/ladybug) engine. Packaging is driven by a Cake Frosting build
+project under [`cake/`](cake) (run it with the `build.ps1` / `build.sh` bootstrap):
 
-- **CI / release** (`.github/workflows/release.yml`) downloads the prebuilt `liblbug-*` assets from
-  an upstream `LadybugDB/ladybug` GitHub Release (pinned via `ENGINE_VERSION`) and stages them into
-  `lib/runtimes/<rid>/native/` before packing the multi-RID NuGet package.
+```bash
+./build.sh --target Test     # build + stage the host native + run the suite
+./build.sh --target Pack     # build the full package family into ./artifacts
+```
+
+The package version tracks the upstream engine version (e.g. `0.17.0`), with an `-alpha.N` prerelease
+suffix while the binding is in development. It is defined once in `version.txt` at the repo root; override
+it with `--package-version <v>` (the release workflow uses the git tag), or `--prerelease ""` for a stable
+build that matches the engine version.
+
+- **`Pack`** stages the prebuilt `liblbug-*` assets for every shipped RID (downloaded from an upstream
+  `LadybugDB/ladybug` GitHub Release, pinned to the engine version from `version.txt`; override with
+  `--engine-version`),
+  packs the managed `LadybugDB` package, one `LadybugDB.Native.<rid>` package per RID, and the
+  `LadybugDB.Native` meta-package, then verifies every package's contents.
+- **CI / release** (`.github/workflows/`) invoke the same pipeline; the release workflow gates on the
+  linux-x64 suite against the real engine and publishes all packages to nuget.org via OIDC.
 - **Local development** is easiest when this repo is checked out as the `tools/csharp_api` submodule
-  inside the Ladybug monorepo: `scripts/build-native-and-test.ps1` then builds `lbug_shared` from the
-  parent engine tree, stages it into `lib/runtimes/win-x64/native/`, and runs the suite.
-
-See `.agents/notes/HANDOFF.md` for details.
+  inside the Ladybug monorepo: `scripts/build-native-and-test.ps1` builds `lbug_shared` from the parent
+  engine tree, stages it into `lib/runtimes/win-x64/native/`, and runs the suite. With a native already
+  staged there, `--target Test` reuses it instead of downloading.

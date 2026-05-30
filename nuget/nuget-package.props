@@ -2,7 +2,9 @@
 
   <!-- NuGet package metadata + native runtime packing. Imported by the packable project. -->
   <PropertyGroup>
-    <Version Condition="'$(Version)' == ''">0.0.1-alpha</Version>
+    <!-- Single source of truth: version.txt at the binding root (e.g. 0.17.0-alpha.1). The cake/
+         pipeline reads the same file; this default only applies to a direct `dotnet pack`. -->
+    <Version Condition="'$(Version)' == ''">$([System.IO.File]::ReadAllText('$(CSharpDir)version.txt').Trim())</Version>
     <Authors>LadybugDB</Authors>
     <Company>LadybugDB</Company>
     <Product>Ladybug</Product>
@@ -22,8 +24,12 @@
 
   <ItemGroup>
     <None Include="$(CSharpDir)README.md" Pack="true" PackagePath="\" Condition="Exists('$(CSharpDir)README.md')" />
-    <!-- Native runtime assets: lib/runtimes/<rid>/native/* -> runtimes/<rid>/native/* in the package. -->
-    <None Include="$(NativeLibDir)runtimes\**\*.*" Pack="true" PackagePath="runtimes" Condition="Exists('$(NativeLibDir)runtimes')" />
   </ItemGroup>
+
+  <!--
+    This package is managed-only. The native engine ships separately in the LadybugDB.Native.<rid>
+    packages (and the LadybugDB.Native meta-package); consumers reference LadybugDB plus a native
+    package. See cake/ for the packaging pipeline.
+  -->
 
 </Project>

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="LadybugDB.Build.csproj" />
+  <Folder Name="/native/">
+    <Project Path="native/LadybugDB.Native.Meta.csproj" />
+    <Project Path="native/LadybugDB.Native.Runtime.csproj" />
+  </Folder>
+</Solution>

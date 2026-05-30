@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>LadybugDB.Build</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!-- This is a build orchestrator, not shipped code: relax the doc/analysis settings the binding enforces. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- The native packaging projects under cake/native are separate projects with their own bin/obj;
+       keep their sources (esp. generated AssemblyInfo) and files out of this orchestrator. -->
+  <ItemGroup>
+    <Compile Remove="native/**" />
+    <None Remove="native/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Cake.Frosting" Version="6.2.0" />
+  </ItemGroup>
+
+</Project>
