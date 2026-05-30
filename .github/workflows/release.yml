@@ -1,0 +1,194 @@
+name: Release
+
+# Builds the LadybugDB NuGet package (managed binding + per-RID native libs) and publishes it to
+# nuget.org via trusted publishing (OIDC).
+#
+# Native engine libraries are NOT built here; they are downloaded as prebuilt `liblbug-*` release
+# assets from the upstream engine repo (LadybugDB/ladybug), pinned to ENGINE_VERSION.
+#
+# Triggers:
+#   - push a tag like `v0.1.0`     -> build, test, pack, and PUBLISH to nuget.org
+#   - manual `workflow_dispatch`   -> build, test, and pack only (artifact uploaded; no publish)
+#
+# One-time setup required before the first publish (see notes/HANDOFF.md):
+#   - nuget.org trusted publishing policy: owner=sergey-v9, repo=ladybug-dotnet,
+#     workflow file=release.yml, environment=release
+#   - GitHub environment `release` with secret NUGET_USER = your nuget.org profile name (not email)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version to build (e.g. 0.1.0-preview.1). Not published on manual runs.'
+        required: false
+        default: '0.0.0-dev'
+      engine_version:
+        description: 'LadybugDB/ladybug release tag to pull prebuilt native libs from (overrides ENGINE_VERSION).'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  # Upstream engine release that the prebuilt native libraries are taken from. Bump in lockstep with
+  # the native ABI; override per-run via the workflow_dispatch engine_version input.
+  ENGINE_VERSION: v0.17.0
+
+jobs:
+  # Download prebuilt natives for every RID, stage them, validate end-to-end on linux-x64 against the
+  # real engine, then pack the multi-RID package.
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved package version: $VERSION"
+
+      - name: Download prebuilt native engine
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ENGINE="${{ inputs.engine_version }}"
+          ENGINE="${ENGINE:-$ENGINE_VERSION}"
+          echo "Pulling native libs from LadybugDB/ladybug release: $ENGINE"
+          gh release download "$ENGINE" --repo LadybugDB/ladybug --dir dl \
+            --pattern 'liblbug-windows-x86_64.zip' \
+            --pattern 'liblbug-linux-x86_64.tar.gz' \
+            --pattern 'liblbug-linux-aarch64.tar.gz' \
+            --pattern 'liblbug-osx-x86_64.tar.gz' \
+            --pattern 'liblbug-osx-arm64.tar.gz'
+          ls -l dl
+
+      - name: Stage native libraries into runtimes/<rid>/native
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=lib/runtimes
+          mkdir -p "$ROOT"/{win-x64,linux-x64,linux-arm64,osx-x64,osx-arm64}/native
+          work=$(mktemp -d)
+
+          # Windows x64: zip with lbug_shared.dll
+          unzip -o dl/liblbug-windows-x86_64.zip -d "$work/win"
+          cp "$work/win/lbug_shared.dll" "$ROOT/win-x64/native/lbug_shared.dll"
+
+          # Linux: tarballs contain liblbug.so -> .so.0 -> .so.0.x.y symlink chain; -L copies the
+          # real object into a single regular file (we load it by path, so the SONAME is irrelevant).
+          mkdir -p "$work/lx64" "$work/la64"
+          tar -xzf dl/liblbug-linux-x86_64.tar.gz -C "$work/lx64"
+          cp -L "$work/lx64/liblbug.so" "$ROOT/linux-x64/native/liblbug.so"
+          tar -xzf dl/liblbug-linux-aarch64.tar.gz -C "$work/la64"
+          cp -L "$work/la64/liblbug.so" "$ROOT/linux-arm64/native/liblbug.so"
+
+          # macOS: tarballs contain liblbug.dylib symlink chain; same -L treatment.
+          mkdir -p "$work/mx64" "$work/ma64"
+          tar -xzf dl/liblbug-osx-x86_64.tar.gz -C "$work/mx64"
+          cp -L "$work/mx64/liblbug.dylib" "$ROOT/osx-x64/native/liblbug.dylib"
+          tar -xzf dl/liblbug-osx-arm64.tar.gz -C "$work/ma64"
+          cp -L "$work/ma64/liblbug.dylib" "$ROOT/osx-arm64/native/liblbug.dylib"
+
+          echo "==== staged native libraries ===="
+          find "$ROOT" -type f -printf '%p (%s bytes)\n'
+
+      - name: Test end-to-end (linux-x64 against the real engine)
+        env:
+          LADYBUG_REQUIRE_NATIVE: '1'   # turn a "native didn't load" skip into a hard failure
+        run: dotnet test test/LadybugDB.Tests/LadybugDB.Tests.csproj -c Release -v minimal
+
+      - name: Pack
+        run: >
+          dotnet pack src/LadybugDB/LadybugDB.csproj
+          -c Release
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -o artifacts
+
+      - name: Verify package contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg=$(ls artifacts/*.nupkg)
+          echo "==== $pkg ===="
+          unzip -l "$pkg"
+          listing=$(unzip -Z1 "$pkg")
+          expected=(
+            "lib/net10.0/LadybugDB.dll"
+            "lib/netstandard2.0/LadybugDB.dll"
+            "runtimes/win-x64/native/lbug_shared.dll"
+            "runtimes/linux-x64/native/liblbug.so"
+            "runtimes/linux-arm64/native/liblbug.so"
+            "runtimes/osx-x64/native/liblbug.dylib"
+            "runtimes/osx-arm64/native/liblbug.dylib"
+          )
+          missing=0
+          for entry in "${expected[@]}"; do
+            if ! grep -Fxq "$entry" <<<"$listing"; then
+              echo "::error::package is missing expected entry: $entry"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || { echo "::error::package validation failed"; exit 1; }
+          echo "All expected managed assemblies and per-RID native libraries are present."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+
+  # Publish to nuget.org with trusted publishing. Only runs for v* tags.
+  publish:
+    needs: pack
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write   # required for the OIDC token used by NuGet/login
+      contents: read
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download packed artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-package
+          path: artifacts
+
+      - name: NuGet login (OIDC trusted publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}   # nuget.org profile name, NOT email
+
+      - name: Push to nuget.org
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

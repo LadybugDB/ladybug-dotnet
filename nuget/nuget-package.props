@@ -1,0 +1,29 @@
+<Project>
+
+  <!-- NuGet package metadata + native runtime packing. Imported by the packable project. -->
+  <PropertyGroup>
+    <Version Condition="'$(Version)' == ''">0.0.1-alpha</Version>
+    <Authors>LadybugDB</Authors>
+    <Company>LadybugDB</Company>
+    <Product>Ladybug</Product>
+    <PackageId>LadybugDB</PackageId>
+    <Title>LadybugDB - embedded graph database</Title>
+    <Description>Official C# binding for the Ladybug embedded graph database (Cypher). Wraps the native Ladybug C API via P/Invoke and ships prebuilt native libraries for supported platforms.</Description>
+    <PackageTags>graph;graph-database;database;cypher;embedded;ladybug;olap;analytics</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/ladybugdb/ladybug</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/sergey-v9/ladybug-dotnet</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(CSharpDir)README.md" Pack="true" PackagePath="\" Condition="Exists('$(CSharpDir)README.md')" />
+    <!-- Native runtime assets: lib/runtimes/<rid>/native/* -> runtimes/<rid>/native/* in the package. -->
+    <None Include="$(NativeLibDir)runtimes\**\*.*" Pack="true" PackagePath="runtimes" Condition="Exists('$(NativeLibDir)runtimes')" />
+  </ItemGroup>
+
+</Project>

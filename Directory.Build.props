@@ -1,0 +1,35 @@
+<Project>
+
+  <!-- Shared build settings for the Ladybug C# binding. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+  </PropertyGroup>
+
+  <!-- Host OS / architecture detection, mapped to RID conventions (win/linux/osx, x64/arm64). -->
+  <PropertyGroup>
+    <TargetArchitecture Condition="'$(TargetArchitecture)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</TargetArchitecture>
+    <TargetArchitecture>$(TargetArchitecture.ToLowerInvariant())</TargetArchitecture>
+
+    <TargetOS Condition="'$(TargetOS)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win</TargetOS>
+    <TargetOS Condition="'$(TargetOS)' == '' and $([MSBuild]::IsOSPlatform('Linux'))">linux</TargetOS>
+    <TargetOS Condition="'$(TargetOS)' == '' and $([MSBuild]::IsOSPlatform('OSX'))">osx</TargetOS>
+    <TargetRid>$(TargetOS)-$(TargetArchitecture)</TargetRid>
+  </PropertyGroup>
+
+  <!-- Shared paths. -->
+  <PropertyGroup>
+    <CSharpDir>$(MSBuildThisFileDirectory)</CSharpDir>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(CSharpDir)..\..\'))</RepoRoot>
+    <NativeLibDir>$(CSharpDir)lib\</NativeLibDir>
+    <PackageOutputPath>$(CSharpDir)packages</PackageOutputPath>
+  </PropertyGroup>
+
+</Project>

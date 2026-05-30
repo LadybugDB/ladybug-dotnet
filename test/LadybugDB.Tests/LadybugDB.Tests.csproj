@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Xunit.SkippableFact" Version="1.5.61" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LadybugDB\LadybugDB.csproj" />
+  </ItemGroup>
+
+  <!-- Copy the native library next to the test output if it has been placed under lib/runtimes/<rid>/native. -->
+  <Target Name="PlaceNativeLibrary" AfterTargets="Build">
+    <ItemGroup>
+      <_LadybugNative Include="$(NativeLibDir)runtimes\$(TargetRid)\native\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_LadybugNative)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'@(_LadybugNative)' != ''" />
+  </Target>
+
+</Project>
