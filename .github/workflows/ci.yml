@@ -1,9 +1,8 @@
 name: CI
 
-# Fast managed-only validation for the C# binding. Builds both target frameworks, runs the test
-# suite (ABI/struct-layout tests run; native round-trip tests skip without a native lib), and
-# verifies the package still packs. Native cross-platform builds + the end-to-end gate live in
-# release.yml.
+# Fast managed validation plus native smoke coverage for the C# binding. The managed job builds
+# both target frameworks and verifies packing; the native matrix stages prebuilt engine libraries
+# and runs the same test suite with native skips disabled.
 
 on:
   push:
@@ -26,6 +25,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # Upstream engine release that the prebuilt native libraries are taken from. Bump in lockstep with
+  # the native ABI; release.yml uses the same default.
+  ENGINE_VERSION: v0.17.0
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -45,3 +49,63 @@ jobs:
 
       - name: Pack smoke check
         run: dotnet pack src/LadybugDB/LadybugDB.csproj -c Release -o artifacts
+
+  native-test:
+    name: native-test (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            asset: liblbug-linux-x86_64.tar.gz
+            library: liblbug.so
+          - os: windows-latest
+            rid: win-x64
+            asset: liblbug-windows-x86_64.zip
+            library: lbug_shared.dll
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download prebuilt native engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ matrix.asset }}
+        run: gh release download "$ENGINE_VERSION" --repo LadybugDB/ladybug --dir dl --pattern "$ASSET"
+        shell: bash
+
+      - name: Stage native library (Linux)
+        if: matrix.rid == 'linux-x64'
+        run: |
+          set -euo pipefail
+          mkdir -p lib/runtimes/${{ matrix.rid }}/native
+          work=$(mktemp -d)
+          tar -xzf dl/${{ matrix.asset }} -C "$work"
+          cp -L "$work/${{ matrix.library }}" lib/runtimes/${{ matrix.rid }}/native/${{ matrix.library }}
+          ls -l lib/runtimes/${{ matrix.rid }}/native
+        shell: bash
+
+      - name: Stage native library (Windows)
+        if: matrix.rid == 'win-x64'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $nativeDir = 'lib/runtimes/${{ matrix.rid }}/native'
+          New-Item -ItemType Directory -Force -Path $nativeDir | Out-Null
+          $work = Join-Path $env:RUNNER_TEMP 'lbug-native'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          Expand-Archive -Path 'dl/${{ matrix.asset }}' -DestinationPath $work -Force
+          Copy-Item -Path (Join-Path $work '${{ matrix.library }}') -Destination (Join-Path $nativeDir '${{ matrix.library }}') -Force
+          Get-ChildItem $nativeDir
+        shell: pwsh
+
+      - name: Test against native engine
+        env:
+          LADYBUG_REQUIRE_NATIVE: '1'
+        run: dotnet test test/LadybugDB.Tests/LadybugDB.Tests.csproj -c Release -v minimal
