@@ -11,7 +11,7 @@ name: Release
 #   - manual `workflow_dispatch`   -> build, test, and pack only (artifact uploaded; no publish)
 #
 # One-time setup required before the first publish (see notes/HANDOFF.md):
-#   - nuget.org trusted publishing policy: owner=sergey-v9, repo=ladybug-dotnet,
+#   - nuget.org trusted publishing policy: owner=LadybugDB, repo=ladybug-dotnet,
 #     workflow file=release.yml, environment=release
 #   - GitHub environment `release` with secret NUGET_USER = your nuget.org profile name (not email)
 

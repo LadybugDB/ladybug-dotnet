@@ -6,9 +6,10 @@ Legend: [x] done and verified here. As of 2026-05-29 the native `lbug_shared.dll
 (MSVC + Ninja, win-x64) and the full suite passes end-to-end (28/28, 0 skipped), so the previous
 "[~] awaiting native validation" markers are now resolved for win-x64.
 
-As of 2026-05-30 the binding was split into the standalone `sergey-v9/ladybug-dotnet` repo and wired
-back into the monorepo as the `tools/csharp_api` submodule (local only). The suite still passes
-28/28 from the submodule, building `lbug_shared` against the parent engine via `../../`.
+As of 2026-05-30 the binding was split into a standalone repo - now adopted into the LadybugDB org as
+`LadybugDB/ladybug-dotnet` - and wired back into the monorepo as the `tools/csharp_api` submodule (local
+only). The suite still passes 28/28 from the submodule, building `lbug_shared` against the parent engine
+via `../../`.
 
 ## Phase 0 - Scaffold  [x]
 - [x] `tools/csharp_api/` layout
@@ -44,14 +45,15 @@ back into the monorepo as the `tools/csharp_api` submodule (local only). The sui
 - [x] win-x64 native lib wired into `lib/runtimes/win-x64/native/` and loaded by the tests
 - [x] Package contains the win-x64 native lib at `runtimes/win-x64/native/lbug_shared.dll`;
       consume-test from a local feed runs queries end-to-end (native asset flows to consumer output)
-- [x] Repo split: standalone `sergey-v9/ladybug-dotnet`, wired as the `tools/csharp_api` submodule (local)
+- [x] Repo split: standalone `LadybugDB/ladybug-dotnet` (in the LadybugDB org), wired as the `tools/csharp_api` submodule (local)
 - [x] Multi-RID release workflow (`.github/workflows/release.yml`, tag `v*`): downloads prebuilt
       `liblbug-*` for all 5 RIDs (win-x64, linux-x64/arm64, osx-x64/arm64) from `LadybugDB/ladybug`
       releases (pinned `ENGINE_VERSION`), stages -> linux-x64 gate -> packs -> asserts contents -> OIDC publish
-- [x] Lightweight `.github/workflows/ci.yml` (both TFMs + managed/ABI tests + pack smoke check) on PR/push
-- [ ] One-time nuget.org trusted-publishing policy + `release` environment / `NUGET_USER` secret (user action)
-- [ ] First green CI run (release workflow needs a `LadybugDB/ladybug` release carrying `liblbug-*`; confirm `ENGINE_VERSION`)
-- [ ] Package-id ownership / repo transfer to the LadybugDB org before a real publish
+- [x] `.github/workflows/ci.yml` on PR/push: managed `build-test` (both TFMs + ABI tests + pack smoke) plus a `native-test` matrix (linux-x64 + win-x64) running the suite against downloaded natives
+- [x] Repo adopted into the LadybugDB org as `LadybugDB/ladybug-dotnet`
+- [ ] One-time nuget.org trusted-publishing policy + `release` environment / `NUGET_USER` secret (maintainer action)
+- [ ] First green release run (`release.yml` needs a `LadybugDB/ladybug` release carrying `liblbug-*`; confirm `ENGINE_VERSION` = `v0.17.0`)
+- [ ] `LadybugDB` package-id ownership/reservation on nuget.org before a real publish
 - [ ] Optional: win-arm64 / linux-musl RIDs (not produced by the upstream precompiled workflow today)
 
 ## Phase 5 (optional) - Extras  [pending]

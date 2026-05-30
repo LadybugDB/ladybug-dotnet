@@ -99,8 +99,8 @@ Keep this updated whenever a decision is made.
   out of the heavy release path.
 
 ## D16 - Standalone repo + submodule; natives via upstream release download (supersedes D15's CI shape)
-- Repo split: the binding now lives in its own repo, `sergey-v9/ladybug-dotnet` (temporary home; to be
-  transferred to the LadybugDB org if the maintainers adopt it). It is developed as a git submodule
+- Repo split: the binding lives in its own repo, `LadybugDB/ladybug-dotnet` (adopted into the LadybugDB
+  org from its initial personal home). It is developed as a git submodule
   mounted at `tools/csharp_api` in `LadybugDB/ladybug`, exactly mirroring `tools/rust_api` ->
   `ladybug-rust` and `tools/java_api` -> `ladybug-java` (see the monorepo `.gitmodules`). The repo
   root == the old `tools/csharp_api/` contents (so `src/`, `test/`, `.github/`, `.agents/` sit at the
@@ -120,11 +120,19 @@ Keep this updated whenever a decision is made.
   build/test/pack; path filters now repo-relative) and `csharp-release.yml` ->
   `.github/workflows/release.yml` (download-natives -> stage -> linux-x64 gate -> pack -> assert ->
   OIDC publish). Release tag is now `v*` (not `csharp-v*`); `v1.2.3` -> package version `1.2.3`.
-- Trusted publishing now targets this repo: nuget.org policy owner=`sergey-v9`, repo=`ladybug-dotnet`,
-  workflow=`release.yml`, env=`release`. Caveat: publishing the official `LadybugDB` package id requires
-  id ownership - a personal-repo publish is a dry run until the repo/package move to the org.
+- Trusted publishing now targets this repo: nuget.org policy owner=`LadybugDB`, repo=`ladybug-dotnet`,
+  workflow=`release.yml`, env=`release`. The repo now lives in the LadybugDB org; publishing the official
+  `LadybugDB` package id still needs the nuget.org policy wired up and package-id ownership on that account.
 - The staging/`cp -L`/RID-mapping/package-content-assertion logic and the `LADYBUG_REQUIRE_NATIVE=1`
   gate from D15 all carry over unchanged; only the source of the native artifacts differs.
+
+## D17 - Adopted into the LadybugDB org; native CI matrix
+- The repo was adopted into the LadybugDB org as `LadybugDB/ladybug-dotnet` (no longer a personal repo).
+  The submodule `origin` and the monorepo `.gitmodules` URL were repointed to it; the trusted-publishing
+  policy owner is now `LadybugDB` and `RepositoryUrl` points at the org repo.
+- `ci.yml` gained a `native-test` matrix (linux-x64 + win-x64) that downloads the prebuilt `liblbug-*`
+  for `ENGINE_VERSION` (now pinned to `v0.17.0`) and runs the full suite with `LADYBUG_REQUIRE_NATIVE=1`,
+  so native round-trips run on every push - not only in the release gate.
 
 ## Open (decide later)
 - Timestamp representation: `DateTime` (UTC) for non-tz precisions vs `DateTimeOffset` for `TIMESTAMP_TZ` (Phase 2).
