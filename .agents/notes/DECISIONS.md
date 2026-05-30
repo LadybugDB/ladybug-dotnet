@@ -98,7 +98,35 @@ Keep this updated whenever a decision is made.
   round-trips skip) + a pack smoke check on every PR/push touching the binding - fast feedback kept
   out of the heavy release path.
 
+## D16 - Standalone repo + submodule; natives via upstream release download (supersedes D15's CI shape)
+- Repo split: the binding now lives in its own repo, `sergey-v9/ladybug-dotnet` (temporary home; to be
+  transferred to the LadybugDB org if the maintainers adopt it). It is developed as a git submodule
+  mounted at `tools/csharp_api` in `LadybugDB/ladybug`, exactly mirroring `tools/rust_api` ->
+  `ladybug-rust` and `tools/java_api` -> `ladybug-java` (see the monorepo `.gitmodules`). The repo
+  root == the old `tools/csharp_api/` contents (so `src/`, `test/`, `.github/`, `.agents/` sit at the
+  root). For now the submodule is wired in the monorepo LOCALLY ONLY and not pushed upstream.
+- Native source CHANGED from D15: the release workflow no longer reuses the monorepo's
+  `precompiled-bin-workflow.yml`. A cross-repo reusable-workflow call does a plain `actions/checkout`,
+  which checks out the CALLER (this C# repo, which has no engine source) and would fail to build.
+  Instead, `release.yml` downloads the prebuilt `liblbug-*` assets from a `LadybugDB/ladybug` GitHub
+  Release (`gh release download`), pinned to `ENGINE_VERSION`. This is decoupled, fast, and version-
+  pinned - how a published binding consumes a released C lib in reality. `release-artifacts.yml`
+  upstream already attaches those assets to releases.
+- Engine version pin: `ENGINE_VERSION` (env in `release.yml`, overridable via the `engine_version`
+  dispatch input) is the upstream tag the natives come from. The two repos are no longer one commit;
+  bumping it requires re-syncing the managed signatures/structs/enums against that release's
+  `lbug.h` and updating the ABI tests in the same change (also captured in `AGENTS.md`).
+- Workflows renamed for the dedicated repo: `csharp-ci.yml` -> `.github/workflows/ci.yml` (managed-only
+  build/test/pack; path filters now repo-relative) and `csharp-release.yml` ->
+  `.github/workflows/release.yml` (download-natives -> stage -> linux-x64 gate -> pack -> assert ->
+  OIDC publish). Release tag is now `v*` (not `csharp-v*`); `v1.2.3` -> package version `1.2.3`.
+- Trusted publishing now targets this repo: nuget.org policy owner=`sergey-v9`, repo=`ladybug-dotnet`,
+  workflow=`release.yml`, env=`release`. Caveat: publishing the official `LadybugDB` package id requires
+  id ownership - a personal-repo publish is a dry run until the repo/package move to the org.
+- The staging/`cp -L`/RID-mapping/package-content-assertion logic and the `LADYBUG_REQUIRE_NATIVE=1`
+  gate from D15 all carry over unchanged; only the source of the native artifacts differs.
+
 ## Open (decide later)
 - Timestamp representation: `DateTime` (UTC) for non-tz precisions vs `DateTimeOffset` for `TIMESTAMP_TZ` (Phase 2).
 - Whether to expose write-side construction of unsigned / `UNION` / `ARRAY` values and full `INTERVAL` (months/days).
-- `win-arm64` / `linux-musl` coverage (not produced by the precompiled workflow today).
+- `win-arm64` / `linux-musl` coverage (not produced by the upstream precompiled workflow today).

@@ -3,19 +3,23 @@
 Current state, how to build/test, and immediate next steps. Keep this current whenever work pauses.
 
 ## Current state
-- Phases 0-3 implemented under `tools/csharp_api/`. The solution builds for BOTH target frameworks
-  (`net10.0` + `netstandard2.0`), and `dotnet pack` produces a valid package.
+- Now a standalone repo: `sergey-v9/ladybug-dotnet` (temporary home; intended to move to the LadybugDB
+  org). Developed as the `tools/csharp_api` submodule of `LadybugDB/ladybug` (mirrors `tools/rust_api`,
+  `tools/java_api`). The submodule is currently wired in the monorepo LOCALLY ONLY (not pushed upstream).
+- Phases 0-3 implemented. The solution builds for BOTH target frameworks (`net10.0` + `netstandard2.0`),
+  and `dotnet pack` produces a valid package.
 - END-TO-END VALIDATED on Windows x64: native `lbug_shared.dll` built locally with MSVC + Ninja and
-  the full xUnit suite passes (27/27, 0 skipped) against the real engine.
-- The C# project does NOT build native code. It P/Invokes the Ladybug C API
-  (`src/include/c_api/lbug.h`) exported from the `lbug_shared` target.
+  the full xUnit suite passes (28/28, 0 skipped) against the real engine - including from the submodule
+  checkout, which builds the parent engine via `../../`.
+- The C# project does NOT build native code. It P/Invokes the Ladybug C API (`lbug.h`, in the parent
+  `LadybugDB/ladybug` repo) exported from the `lbug_shared` target.
 
 ## What works (verified)
 - Interop: `LibraryImport` (net7+) / `DllImport` (ns2.0) for ~90 C API functions, resolver, UTF-8 helpers.
 - API: `Database`, `Connection`, `QueryResult`, `FlatTuple`, `Value` (full type system),
   `PreparedStatement` (typed + object binding), `LadybugVersion`, graph types, `SystemConfig`.
-- 27 xUnit tests: 17 ABI/struct-layout guards + 10 native round-trip tests (smoke, type-mapping,
-  prepared statements) all PASSING against `lbug_shared.dll`.
+- 28 xUnit tests: 17 ABI/struct-layout guards + 10 native round-trip tests (smoke, type-mapping,
+  prepared statements) + 1 native-required gate, all PASSING against `lbug_shared.dll`.
 
 ## Local toolchain on this machine (verified 2026-05-29)
 - Visual Studio Community 2026 (v18.6): MSVC `14.51.36231` (`cl.exe` x64) + Windows SDK `10.0.26100`.
@@ -72,7 +76,7 @@ dotnet pack  src/LadybugDB/LadybugDB.csproj -c Release -p:Version=0.1.0-local
 tools/csharp_api/
   Directory.Build.props          # shared build props (LangVersion, OS/arch detection, paths)
   nuget/nuget-package.props      # package metadata + native runtime packing
-  LadybugDB.sln
+  LadybugDB.slnx
   src/LadybugDB/                 # the binding (multi-target net10.0 + netstandard2.0)
     Interop/                     # Native (P/Invoke), per-TFM marshaling, structs, resolver
     *.cs                         # Database, Connection, QueryResult, FlatTuple, Value, ...
@@ -88,41 +92,45 @@ tools/csharp_api/
   output, where the DllImport resolver finds it. `lib/` is gitignored, so the DLL is a local artifact.
 - Tests SKIP (not fail) when the native lib is absent (`TestEnvironment.NativeAvailable`).
 
-## CI / CD (GitHub Actions)
-Two workflows at the repo root drive cross-platform packaging + publishing:
-- `.github/workflows/csharp-ci.yml` - PR/push validation. Builds both TFMs, runs the managed + ABI
-  suite (native round-trips skip without a native lib), and a `dotnet pack` smoke check. Path-filtered
-  to `tools/csharp_api/**` + `lbug.h`.
-- `.github/workflows/csharp-release.yml` - the release pipeline. Three jobs:
-  1. `build-native`: `uses: ./.github/workflows/precompiled-bin-workflow.yml` to build `liblbug` for
-     all 5 RIDs (reuses the repo's canonical native builder; see DECISIONS D15).
-  2. `pack`: downloads those artifacts, `cp -L`s each shared lib into `lib/runtimes/<rid>/native/`
+## CI / CD (GitHub Actions, in the standalone repo)
+Two workflows at the repo root. They do NOT build the engine - natives come from upstream releases.
+- `.github/workflows/ci.yml` - PR/push validation. Builds both TFMs, runs the managed + ABI suite
+  (native round-trips skip without a native lib), and a `dotnet pack` smoke check. Path-filtered to
+  `src/**`, `test/**`, `**/*.props`, `LadybugDB.slnx`.
+- `.github/workflows/release.yml` - the release pipeline. Two jobs:
+  1. `pack`: `gh release download "$ENGINE_VERSION" --repo LadybugDB/ladybug` pulls the prebuilt
+     `liblbug-*` assets for all 5 RIDs, `cp -L`s each into `lib/runtimes/<rid>/native/`
      (win-x64=`lbug_shared.dll`, linux-x64/arm64=`liblbug.so`, osx-x64/arm64=`liblbug.dylib`),
-     runs the FULL suite on linux-x64 against the real engine as a gate, packs with `-p:Version` from
-     the tag, then ASSERTS all 5 natives + both managed TFMs are in the `.nupkg`.
-  3. `publish` (only on `csharp-v*` tags, `environment: release`): trusted publishing via
-     `NuGet/login@v1` (`id-token: write`) + `dotnet nuget push --skip-duplicate`.
+     runs the FULL suite on linux-x64 against the real engine as a gate (`LADYBUG_REQUIRE_NATIVE=1`),
+     packs with `-p:Version` from the tag, then ASSERTS all 5 natives + both managed TFMs are in the `.nupkg`.
+  2. `publish` (only on `v*` tags, `environment: release`): trusted publishing via `NuGet/login@v1`
+     (`id-token: write`) + `dotnet nuget push --skip-duplicate`.
+- `ENGINE_VERSION` (env in `release.yml`) pins the upstream engine release the natives are taken from;
+  override per-run with the `engine_version` dispatch input. Keep it in sync with the managed ABI.
 
 ### Releasing a version
 ```bash
-git tag csharp-v0.1.0      # tag drives the package version (csharp-v1.2.3 -> 1.2.3)
-git push origin csharp-v0.1.0
+git tag v0.1.0            # tag drives the package version (v1.2.3 -> 1.2.3)
+git push origin v0.1.0
 ```
 `workflow_dispatch` (with a `version` input) builds + packs + uploads the artifact WITHOUT publishing -
-use it to dry-run the cross-platform build before tagging.
+use it to dry-run the multi-RID build before tagging.
 
 ### One-time setup before the first publish (USER ACTION)
 - nuget.org -> Account -> Trusted Publishing -> Add policy:
-  owner=`LadybugDB`, repo=`ladybug`, workflow file=`csharp-release.yml`, environment=`release`.
+  owner=`sergey-v9`, repo=`ladybug-dotnet`, workflow file=`release.yml`, environment=`release`.
 - Repo Settings -> Environments -> `release`: add secret `NUGET_USER` = your nuget.org PROFILE name
   (not email). Optionally add required reviewers as an approval gate.
-- `LadybugDB` package id is unclaimed/permanent once first pushed - verify before tagging.
+- The official `LadybugDB` package id requires ownership; from a personal repo treat the publish as a
+  dry run until the repo/package id move to the LadybugDB org (then re-point the policy + RepositoryUrl).
 - Before the first real publish, dry-run: `dotnet pack -c Release -o ./artifacts` (or the dispatch run).
 
 ## Next steps
-1. Run `csharp-release.yml` via `workflow_dispatch` once to confirm the cross-platform natives build
-   and the package assembles+passes the linux-x64 gate (the matrix has only been proven on win-x64
-   locally so far).
-2. Complete the nuget.org trusted-publishing policy + `release` environment, then tag `csharp-v*`.
-3. Phase 3 (remaining): expand the suite to mirror the Java + C API tests over `dataset/tinysnb`.
-4. Phase 5 (optional): Native AOT validation, Arrow C Data interface, observability.
+1. Confirm `LadybugDB/ladybug` has a release carrying the `liblbug-*` assets and set `ENGINE_VERSION`
+   to it, then run `release.yml` via `workflow_dispatch` once to confirm the multi-RID natives download,
+   the package assembles, and the linux-x64 gate passes (proven on win-x64 locally so far).
+2. Complete the nuget.org trusted-publishing policy + `release` environment, then tag `v*`.
+3. If/when maintainers adopt it: transfer the repo to the LadybugDB org, repoint `.gitmodules` upstream,
+   and update the trusted-publishing policy + `RepositoryUrl`.
+4. Phase 3 (remaining): expand the suite to mirror the Java + C API tests over `dataset/tinysnb`.
+5. Phase 5 (optional): Native AOT validation, Arrow C Data interface, observability.
