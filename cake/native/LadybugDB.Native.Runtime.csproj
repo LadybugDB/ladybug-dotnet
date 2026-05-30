@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="$(MSBuildThisFileDirectory)..\common.props" />
+
+  <!--
+    One template, packed once per RID via:
+      dotnet pack ... -p:NativeRid=<rid> -p:PackageId=LadybugDB.Native.<rid> -p:Version=<v>
+    It carries a single native runtime asset (runtimes/<rid>/native/*) plus an empty lib marker, and
+    emits no managed assembly of its own.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+
+    <NativeRid Condition="'$(NativeRid)' == ''">win-x64</NativeRid>
+    <PackageId Condition="'$(PackageId)' == ''">LadybugDB.Native.$(NativeRid)</PackageId>
+    <Title>LadybugDB native engine ($(NativeRid))</Title>
+    <Description>Native Ladybug engine library for $(NativeRid). Companion runtime payload for the managed LadybugDB package; reference it (or the LadybugDB.Native meta-package) alongside LadybugDB.</Description>
+
+    <!-- No managed assembly and no dependencies: silence the "package has no lib/ref" check. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(NativeLibDir)runtimes\$(NativeRid)\native\**\*">
+      <Pack>true</Pack>
+      <PackagePath>runtimes\$(NativeRid)\native\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)_._">
+      <Pack>true</Pack>
+      <PackagePath>lib\netstandard2.0\_._</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

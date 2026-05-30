@@ -19,7 +19,7 @@ descriptions under [Deeper docs](#deeper-docs)).
 `lbug.h`; stage a native lib and run the FULL test suite before proposing any interop change (ABI
 bugs never surface at compile time).
 - **Ask first:** changing marshalling, calling convention, or struct layout; bumping the pinned engine
-version (`ENGINE_VERSION`); adding/dropping a RID or changing `runtimes/{rid}/native/` packaging.
+version (the base of `version.txt`); adding/dropping a RID or changing `runtimes/{rid}/native/` packaging.
 - **Never:** alter a struct's field order/width, the `byte`-for-C-`bool` rule, or the who-frees-what
 string/blob ownership without sign-off. Never add a finalizer or `SafeHandle` to the disposables
 (deliberate — see D10). Never commit native binaries: everything under `lib/` is a gitignored artifact.
@@ -83,19 +83,39 @@ There is **no** binding generator (no ClangSharp). "Source-generated" refers onl
 ## Upstream coupling
 
 The binding targets the Ladybug engine C API in the separate `LadybugDB/ladybug` repo, pinned to one
-release: `ENGINE_VERSION` in `.github/workflows/release.yml` is the upstream tag the
-prebuilt natives are pulled from. The two repos are no longer a single commit: when bumping
-`ENGINE_VERSION`, re-sync the managed signatures/structs/enums against that release's
-`src/include/c_api/lbug.h` and update the ABI tests in the same change.
+release: the engine tag is the base of `version.txt` at the repo root (e.g. `0.17.0-alpha.1` -> `v0.17.0`),
+overridable per build via `--engine-version` / `ENGINE_VERSION`. The two repos are no longer a single
+commit: when moving to a new engine release, re-sync the managed signatures/structs/enums against that
+release's `src/include/c_api/lbug.h` and update the ABI tests in the same change.
 
 ## Packaging
 
-`dotnet pack src/LadybugDB/LadybugDB.csproj -c Release -p:Version=<v>` bundles whatever sits under
-`lib/runtimes/<rid>/native/` into `runtimes/<rid>/native/` in the `.nupkg`. Shipped RIDs: win-x64,
-linux-x64, linux-arm64, osx-x64, osx-arm64. The release pipeline (`.github/workflows/release.yml`,
-tag `v`*) downloads the prebuilt `liblbug-`* assets for the pinned `ENGINE_VERSION` from
-`LadybugDB/ladybug` releases, stages them, gates on the linux-x64 suite, asserts package contents,
-then publishes via OIDC. Details + one-time nuget.org setup: `.agents/notes/HANDOFF.md`.
+The binding ships as a **family** of packages, not one fat package: the managed-only `LadybugDB`, one
+`LadybugDB.Native.<rid>` per RID (carrying just `runtimes/<rid>/native/*` + an empty `_._` lib marker),
+and the `LadybugDB.Native` meta-package that depends on all of them. Consumers reference `LadybugDB`
+plus a native package (the meta for all platforms, or a single RID for a slim app). Shipped RIDs:
+win-x64, linux-x64, linux-arm64, osx-x64, osx-arm64.
+
+A **Cake Frosting** build project under `cake/` drives everything (don't hand-run `dotnet pack`):
+
+```bash
+./build.sh --target Test                           # build + stage host native + run the suite
+./build.sh --target Pack --package-version <v>     # full family into ./artifacts, then verify contents
+```
+
+- `cake/BuildContext.cs` is the single source of truth for the RID set and the RID->(asset, library)
+  mapping; `EnsureNativeStaged` downloads the pinned engine asset (`gh`) and extracts the canonical
+  library into `lib/runtimes/<rid>/native/` (skips when one is already staged from a local source build).
+- `cake/native/LadybugDB.Native.Runtime.csproj` is one template packed once per RID; the meta-package
+  is `cake/native/LadybugDB.Native.nuspec` (version/commit tokens substituted at pack time). `_._` and
+  `SuppressDependenciesWhenPacking` keep the native packages free of compile references and framework deps.
+- `VerifyPackages` asserts the managed assemblies, every per-RID payload, and the meta's dependency set.
+
+The release pipeline (`.github/workflows/release.yml`, tag `v*`) runs `--target Test` (linux-x64 gate
+against the real engine) then `--target Pack`, and publishes all 7 packages via OIDC. The engine release
+the natives come from defaults to the version's base (`version.txt`, or the `v*` tag on release). Details
++ one-time nuget.org setup (the trusted publishing policy must now cover every package id):
+`.agents/notes/HANDOFF.md`.
 
 ## Deeper docs
 

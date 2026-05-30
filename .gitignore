@@ -2,5 +2,7 @@ bin/
 obj/
 packages/
 lib/
+artifacts/
+download/
 *.user
 .vs/

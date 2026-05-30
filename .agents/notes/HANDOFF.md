@@ -49,19 +49,31 @@ Copy-Item build/release/src/lbug_shared.dll tools/csharp_api/lib/runtimes/win-x6
 dotnet test tools/csharp_api/test/LadybugDB.Tests/LadybugDB.Tests.csproj
 ```
 
-## Managed-only build / pack (no native needed)
+## Build / test / pack via the Cake Frosting pipeline (`cake/`)
+All packaging is driven by the Cake Frosting build project under `cake/` (don't hand-run `dotnet pack`).
+Use the `build.ps1` / `build.sh` bootstrap from `tools/csharp_api`:
 ```powershell
-cd tools/csharp_api
-dotnet build LadybugDB.slnx -c Release          # both TFMs, 0 warnings
-dotnet pack  src/LadybugDB/LadybugDB.csproj -c Release -p:Version=0.1.0-local
+./build.ps1 --target Test     # build both TFMs + stage host native + run suite
+./build.ps1 --target Pack     # full package family -> ./artifacts, verified
 ```
-- Whatever native libs sit under `lib/runtimes/<rid>/native/` at pack time are bundled into the
-  package at `runtimes/<rid>/native/`. With only win-x64 staged, the package is win-x64-only.
-- Verified package contents: `lib/net10.0` + `lib/netstandard2.0` (each with XML docs), `README.md`,
-  and `runtimes/win-x64/native/lbug_shared.dll`. Zero external dependencies in the nuspec.
-- Verified by consuming `LadybugDB.0.1.0-local.nupkg` from a local feed: queries run end-to-end and
-  the native DLL flows to the consumer's `bin/.../runtimes/win-x64/native/` automatically.
-- Output goes to `tools/csharp_api/packages/` (gitignored).
+- Versioning: the package version tracks the upstream engine version (`v0.17.0` -> `0.17.0`) with an
+  `-alpha.N` prerelease suffix while in development, so the default is `0.17.0-alpha.1`. It lives in ONE
+  place - `version.txt` at the binding root - which `BuildContext`, `nuget-package.props`, and both
+  workflows all read; bump the alpha (or the engine) there with no code change. Overrides: `--prerelease
+  alpha.2` (suffix), `--package-version <v>` (exact; the release workflow passes the git tag), and
+  `--prerelease ""` (stable build equal to the engine version).
+- The binding now ships a FAMILY (see DECISIONS D18): managed-only `LadybugDB`, one
+  `LadybugDB.Native.<rid>` per RID, and the `LadybugDB.Native` meta-package. `Pack` stages every RID's
+  native (downloading from the pinned engine release when not already present), packs all 7, and
+  `VerifyPackages` asserts contents.
+- VERIFIED locally end-to-end (2026-05-30, win-x64 host, engine `v0.17.0`): `--target Pack` produced
+  and verified all 7 packages; `--target Test` passed 28/28 with the native loaded. Confirmed layouts:
+  `LadybugDB` = `lib/net10.0` + `lib/netstandard2.0` (with XML docs) + `README.md`, no `runtimes/` and
+  zero dependencies; `LadybugDB.Native.<rid>` = `runtimes/<rid>/native/<lib>` + `lib/netstandard2.0/_._`
+  and no dependencies; `LadybugDB.Native` = `_._` + dependencies on all five per-RID packages.
+- Cake arg notes: the package version is `--package-version` (the host reserves `--version`);
+  `--engine-version` overrides the pinned engine; `--commit` (or `GITHUB_SHA`) stamps the repository
+  metadata. Packages land in `tools/csharp_api/artifacts/` (gitignored).
 
 ## Gotchas
 - PowerShell mangles `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` into `=3` when args aren't quoted; pass cmake
@@ -75,14 +87,28 @@ dotnet pack  src/LadybugDB/LadybugDB.csproj -c Release -p:Version=0.1.0-local
 ```
 tools/csharp_api/
   Directory.Build.props          # shared build props (LangVersion, OS/arch detection, paths)
-  nuget/nuget-package.props      # package metadata + native runtime packing
+  nuget/nuget-package.props      # managed package metadata (managed-only; natives ship separately)
   LadybugDB.slnx
+  build.ps1 / build.sh           # bootstrap for the Cake Frosting pipeline
+  cake/                          # Cake Frosting packaging pipeline (NOT in LadybugDB.slnx)
+    LadybugDB.Build.csproj       # the build console app (Cake.Frosting)
+    BuildContext.cs              # Main entry point + RID set, paths, EnsureNativeStaged()
+    Tasks/                       # Clean, Restore, BuildManaged, Test, FetchNatives,
+                                 #   PackManaged, PackRuntimes, PackNativeMeta, VerifyPackages, Pack, Default
+    common.props                 # shared NuGet metadata for the native packages
+    native/                      # native packaging assets
+      LadybugDB.Native.Runtime.csproj  # one template, packed once per RID
+      LadybugDB.Native.Meta.csproj     # thin host to pack the meta nuspec via dotnet
+      LadybugDB.Native.nuspec          # meta-package template ($version$/$commit$ tokens)
+      _._                              # empty lib marker
   src/LadybugDB/                 # the binding (multi-target net10.0 + netstandard2.0)
     Interop/                     # Native (P/Invoke), per-TFM marshaling, structs, resolver
     *.cs                         # Database, Connection, QueryResult, FlatTuple, Value, ...
   test/LadybugDB.Tests/          # xUnit tests (net10.0)
-  lib/runtimes/<rid>/native/     # native libs are dropped here for packaging/tests (gitignored)
-  .agents/notes/               # DECISIONS / HANDOFF / ROADMAP
+  lib/runtimes/<rid>/native/     # native libs are staged here for packaging/tests (gitignored)
+  artifacts/                     # produced .nupkg/.snupkg (gitignored)
+  download/                      # cached engine release assets (gitignored)
+  .agents/notes/                 # DECISIONS / HANDOFF / ROADMAP
 ```
 
 ## Native library requirement
@@ -93,47 +119,49 @@ tools/csharp_api/
 - Tests SKIP (not fail) when the native lib is absent (`TestEnvironment.NativeAvailable`).
 
 ## CI / CD (GitHub Actions, in the standalone repo)
-Two workflows at the repo root. They do NOT build the engine - natives come from upstream releases.
-- `.github/workflows/ci.yml` - PR/push validation. The `build-test` job builds both TFMs, runs the
-  managed + ABI suite (native round-trips skip without a native lib), and a `dotnet pack` smoke check.
-  A `native-test` matrix (linux-x64 + win-x64) then downloads the prebuilt `liblbug-*` for `ENGINE_VERSION`
-  from `LadybugDB/ladybug`, stages it, and re-runs the suite with `LADYBUG_REQUIRE_NATIVE=1` (no skips).
-  Path-filtered to `src/**`, `test/**`, `**/*.props`, `LadybugDB.slnx`.
+Both workflows invoke the Cake pipeline via `dotnet run --project cake/LadybugDB.Build.csproj -- ...`
+(natives come from upstream releases; the engine is never built here). `GH_TOKEN` is set so
+`FetchNatives` can download the prebuilt assets.
+- `.github/workflows/ci.yml` - PR/push validation, path-filtered to `src/**`, `test/**`, `cake/**`,
+  `nuget/**`, `**/*.props`, `LadybugDB.slnx`. A `test` matrix (linux-x64 + win-x64) runs `--target Test`
+  (stages the host native, runs the suite with no skips), and a `pack` job runs `--target Pack`
+  (`--package-version 0.0.0-ci`) to build + verify the whole family without publishing.
 - `.github/workflows/release.yml` - the release pipeline. Two jobs:
-  1. `pack`: `gh release download "$ENGINE_VERSION" --repo LadybugDB/ladybug` pulls the prebuilt
-     `liblbug-*` assets for all 5 RIDs, `cp -L`s each into `lib/runtimes/<rid>/native/`
-     (win-x64=`lbug_shared.dll`, linux-x64/arm64=`liblbug.so`, osx-x64/arm64=`liblbug.dylib`),
-     runs the FULL suite on linux-x64 against the real engine as a gate (`LADYBUG_REQUIRE_NATIVE=1`),
-     packs with `-p:Version` from the tag, then ASSERTS all 5 natives + both managed TFMs are in the `.nupkg`.
+  1. `pack`: resolves the version (tag `v1.2.3` -> `1.2.3`) and engine version, runs `--target Test`
+     as the linux-x64 gate against the real engine, then `--target Pack` (which stages all 5 RIDs, packs
+     the 7 packages, and `VerifyPackages` asserts every package's contents). Uploads the artifacts.
   2. `publish` (only on `v*` tags, `environment: release`): trusted publishing via `NuGet/login@v1`
-     (`id-token: write`) + `dotnet nuget push --skip-duplicate`.
-- `ENGINE_VERSION` (env in `release.yml`) pins the upstream engine release the natives are taken from;
-  override per-run with the `engine_version` dispatch input. Keep it in sync with the managed ABI.
+     (`id-token: write`) + `dotnet nuget push "artifacts/*.nupkg" --skip-duplicate` - now pushes ALL 7
+     packages (the `.snupkg` symbols ride along with the managed package).
+- The upstream engine release the natives are taken from defaults to the version's base (from
+  `version.txt`, or the `v*` tag on release); override per-run with `--engine-version` / `ENGINE_VERSION`
+  or the `engine_version` dispatch input. Keep it in sync with the managed ABI.
 
 ### Releasing a version
 ```bash
 git tag v0.1.0            # tag drives the package version (v1.2.3 -> 1.2.3)
 git push origin v0.1.0
 ```
-`workflow_dispatch` (with a `version` input) builds + packs + uploads the artifact WITHOUT publishing -
-use it to dry-run the multi-RID build before tagging.
+`workflow_dispatch` (with a `version` input) builds + packs + uploads the artifacts WITHOUT publishing -
+use it to dry-run the full family build before tagging.
 
 ### One-time setup before the first publish (MAINTAINER ACTION)
-- nuget.org -> Account -> Trusted Publishing -> Add policy:
-  owner=`LadybugDB`, repo=`ladybug-dotnet`, workflow file=`release.yml`, environment=`release`.
+- nuget.org -> Account -> Trusted Publishing -> Add a policy for EACH package id (the publish job pushes
+  all 7): `LadybugDB`, `LadybugDB.Native`, and `LadybugDB.Native.{win-x64, linux-x64, linux-arm64,
+  osx-x64, osx-arm64}`. owner=`LadybugDB`, repo=`ladybug-dotnet`, workflow file=`release.yml`,
+  environment=`release` for each.
 - Repo Settings -> Environments -> `release`: add secret `NUGET_USER` = the nuget.org PROFILE name
-  (not email) that owns/co-owns the package id. Optionally add required reviewers as an approval gate.
-- The `LadybugDB` package id must be owned (or reserved) by that nuget.org account before the first real
-  push; until then, use `workflow_dispatch` / local `dotnet pack` as a dry run.
-- Before the first real publish, dry-run: `dotnet pack -c Release -o ./artifacts` (or the dispatch run).
+  (not email) that owns/co-owns the package ids. Optionally add required reviewers as an approval gate.
+- All 7 package ids must be owned (or reserved) by that nuget.org account before the first real push;
+  until then, use `workflow_dispatch` / local `./build.ps1 --target Pack` as a dry run.
 
 ## Next steps
-1. Confirm the pinned `ENGINE_VERSION` (`v0.17.0`) release of `LadybugDB/ladybug` actually carries the
-   `liblbug-*` assets for all 5 RIDs, then run `release.yml` via `workflow_dispatch` once to confirm the
-   multi-RID natives download, the package assembles, and the linux-x64 gate passes (proven on win-x64
-   locally; the new `ci.yml` native matrix now also exercises linux-x64 + win-x64 on every push).
-2. Complete the nuget.org trusted-publishing policy + `release` environment, then tag `v*`.
-3. Reserve/own the `LadybugDB` package id on nuget.org under the publishing account (the repo already
-   lives in the LadybugDB org).
+1. Local end-to-end is DONE (2026-05-30): `--target Pack` built + verified all 7 packages and
+   `--target Test` passed 28/28 against the engine `v0.17.0` natives on win-x64. Next, run `release.yml`
+   via `workflow_dispatch` once to confirm the same on CI (the linux-x64 gate + all-RID download/pack).
+2. Complete the nuget.org trusted-publishing policies (one per package id) + `release` environment, then
+   tag `v*`.
+3. Reserve/own all 7 package ids on nuget.org under the publishing account (the repo already lives in the
+   LadybugDB org).
 4. Phase 3 (remaining): expand the suite to mirror the Java + C API tests over `dataset/tinysnb`.
 5. Phase 5 (optional): Native AOT validation, Arrow C Data interface, observability.

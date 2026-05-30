@@ -1,8 +1,13 @@
 name: CI
 
-# Fast managed validation plus native smoke coverage for the C# binding. The managed job builds
-# both target frameworks and verifies packing; the native matrix stages prebuilt engine libraries
-# and runs the same test suite with native skips disabled.
+# Fast validation for the C# binding, driven by the Cake Frosting pipeline in cake/.
+#   - test: builds both target frameworks, stages the host RID's prebuilt engine library, and runs the
+#           full suite with native skips disabled.
+#   - pack: produces and validates the whole package family (managed + per-RID native + meta) without
+#           publishing.
+#
+# Native engine libraries are downloaded as prebuilt `liblbug-*` release assets from the upstream engine
+# repo (LadybugDB/ladybug); the release is pinned via version.txt at the binding root.
 
 on:
   push:
@@ -10,6 +15,8 @@ on:
     paths:
       - 'src/**'
       - 'test/**'
+      - 'cake/**'
+      - 'nuget/**'
       - '**/*.props'
       - 'LadybugDB.slnx'
       - '.github/workflows/ci.yml'
@@ -17,6 +24,8 @@ on:
     paths:
       - 'src/**'
       - 'test/**'
+      - 'cake/**'
+      - 'nuget/**'
       - '**/*.props'
       - 'LadybugDB.slnx'
       - '.github/workflows/ci.yml'
@@ -25,13 +34,33 @@ on:
 permissions:
   contents: read
 
-env:
-  # Upstream engine release that the prebuilt native libraries are taken from. Bump in lockstep with
-  # the native ABI; release.yml uses the same default.
-  ENGINE_VERSION: v0.17.0
-
 jobs:
-  build-test:
+  test:
+    name: test (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build + test (stages the host native engine, no skips)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: dotnet run --project cake/LadybugDB.Build.csproj -- --target Test
+
+  pack:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,71 +70,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Build (net10.0 + netstandard2.0)
-        run: dotnet build src/LadybugDB/LadybugDB.csproj -c Release
-
-      - name: Test (managed + ABI guards; native round-trips skip)
-        run: dotnet test test/LadybugDB.Tests/LadybugDB.Tests.csproj -c Release -v minimal
-
-      - name: Pack smoke check
-        run: dotnet pack src/LadybugDB/LadybugDB.csproj -c Release -o artifacts
-
-  native-test:
-    name: native-test (${{ matrix.rid }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            rid: linux-x64
-            asset: liblbug-linux-x86_64.tar.gz
-            library: liblbug.so
-          - os: windows-latest
-            rid: win-x64
-            asset: liblbug-windows-x86_64.zip
-            library: lbug_shared.dll
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Download prebuilt native engine
+      - name: Pack the full package family and verify contents (no publish)
         env:
           GH_TOKEN: ${{ github.token }}
-          ASSET: ${{ matrix.asset }}
-        run: gh release download "$ENGINE_VERSION" --repo LadybugDB/ladybug --dir dl --pattern "$ASSET"
-        shell: bash
+        run: dotnet run --project cake/LadybugDB.Build.csproj -- --target Pack
 
-      - name: Stage native library (Linux)
-        if: matrix.rid == 'linux-x64'
-        run: |
-          set -euo pipefail
-          mkdir -p lib/runtimes/${{ matrix.rid }}/native
-          work=$(mktemp -d)
-          tar -xzf dl/${{ matrix.asset }} -C "$work"
-          cp -L "$work/${{ matrix.library }}" lib/runtimes/${{ matrix.rid }}/native/${{ matrix.library }}
-          ls -l lib/runtimes/${{ matrix.rid }}/native
-        shell: bash
-
-      - name: Stage native library (Windows)
-        if: matrix.rid == 'win-x64'
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $nativeDir = 'lib/runtimes/${{ matrix.rid }}/native'
-          New-Item -ItemType Directory -Force -Path $nativeDir | Out-Null
-          $work = Join-Path $env:RUNNER_TEMP 'lbug-native'
-          New-Item -ItemType Directory -Force -Path $work | Out-Null
-          Expand-Archive -Path 'dl/${{ matrix.asset }}' -DestinationPath $work -Force
-          Copy-Item -Path (Join-Path $work '${{ matrix.library }}') -Destination (Join-Path $nativeDir '${{ matrix.library }}') -Force
-          Get-ChildItem $nativeDir
-        shell: pwsh
-
-      - name: Test against native engine
-        env:
-          LADYBUG_REQUIRE_NATIVE: '1'
-        run: dotnet test test/LadybugDB.Tests/LadybugDB.Tests.csproj -c Release -v minimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
