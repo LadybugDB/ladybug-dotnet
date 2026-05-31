@@ -1,8 +1,8 @@
 # LadybugDB C# examples
 
 Runnable samples for the published `LadybugDB` NuGet packages. They restore from
-[nuget.org](https://www.nuget.org/packages/LadybugDB) and use the version pinned in each
-project file (override with `dotnet run -p:LadybugVersion=<version>`).
+[nuget.org](https://www.nuget.org/packages/LadybugDB) and use the version pinned in
+[`Directory.Build.props`](Directory.Build.props) (override with `dotnet run -p:LadybugVersion=<version>`).
 
 Every project references two packages:
 

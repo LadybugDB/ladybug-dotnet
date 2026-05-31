@@ -7,11 +7,9 @@ live in that parent repo — reachable at `../../` when mounted, NOT in this rep
 enums/structs/signatures mirror that header exactly; if they drift, calls corrupt memory or crash at
 runtime, not at compile time.
 
-**Working notes — read first, keep current.** This binding is an in-progress port driven by three living
-docs under `.agents/notes/`: `ROADMAP.md` (phase status / what's left), `HANDOFF.md` (current state +
-verified build recipe), `DECISIONS.md` (append-only ABI/design/repo-split log). They carry context across
-agent sessions — start a task by reading them, and update the relevant one in the same change (full
-descriptions under [Deeper docs](#deeper-docs)).
+**Maintainer guide — read first, keep current.** Durable repository operations, versioning, release,
+packaging, and ABI-update guidance lives in `MAINTAINING.md`. Start there for non-trivial changes and
+update it when workflow or release policy changes.
 
 ## Boundaries
 
@@ -45,7 +43,7 @@ pwsh -File scripts/build-native-and-test.ps1
 
 Builds `lbug_shared.dll`, stages it into `lib/runtimes/win-x64/native/`, and runs the suite. The
 manual CMake recipe (other OSes, flags, the `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` floor) is in
-`.agents/notes/HANDOFF.md`.
+`MAINTAINING.md`.
 
 ## Tests
 
@@ -83,10 +81,11 @@ There is **no** binding generator (no ClangSharp). "Source-generated" refers onl
 ## Upstream coupling
 
 The binding targets the Ladybug engine C API in the separate `LadybugDB/ladybug` repo, pinned to one
-release: the engine tag is the base of `version.txt` at the repo root (e.g. `0.17.0-alpha.1` -> `v0.17.0`),
-overridable per build via `--engine-version` / `ENGINE_VERSION`. The two repos are no longer a single
-commit: when moving to a new engine release, re-sync the managed signatures/structs/enums against that
-release's `src/include/c_api/lbug.h` and update the ABI tests in the same change.
+release: the engine tag defaults to the first three numeric segments of `version.txt` at the repo root
+(e.g. `0.17.0.1` -> `v0.17.0`), overridable per build via `--engine-version` / `ENGINE_VERSION`.
+The two repos are no longer a single commit: when moving to a new engine release, re-sync the managed
+signatures/structs/enums against that release's `src/include/c_api/lbug.h` and update the ABI tests in
+the same change.
 
 ## Packaging
 
@@ -113,17 +112,15 @@ A **Cake Frosting** build project under `cake/` drives everything (don't hand-ru
 
 The release pipeline (`.github/workflows/release.yml`, tag `v*`) runs `--target Test` (linux-x64 gate
 against the real engine) then `--target Pack`, and publishes all 7 packages via OIDC. The engine release
-the natives come from defaults to the version's base (`version.txt`, or the `v*` tag on release). Details
-+ one-time nuget.org setup (the trusted publishing policy must now cover every package id):
-`.agents/notes/HANDOFF.md`.
+the natives come from defaults to the first three numeric segments of the package version (`version.txt`,
+or the `v*` tag on release). Details + release checklist live in `MAINTAINING.md`.
 
 ## Deeper docs
 
 - `src/include/c_api/lbug.h` (in the parent `LadybugDB/ladybug` repo) — source of truth for every
 signature, struct, and enum.
-- `.agents/notes/DECISIONS.md` — interop/ABI/repo-split decision log (numbered D-entries with rationale).
-- `.agents/notes/HANDOFF.md` — verified native build recipe, gotchas, CI/release, how to cut a release.
-- `.agents/notes/ROADMAP.md` — phased status.
+- `MAINTAINING.md` — repository operations, versioning, packaging, release, native build, and ABI update
+guidance.
 - `dotnet-pinvoke` skill (in the monorepo's `.agents/skills/`) — P/Invoke technique. C# style is
 enforced by the .NET SDK analyzers (the build is warning-clean); don't restate it.
 
