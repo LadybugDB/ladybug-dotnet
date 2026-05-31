@@ -18,8 +18,10 @@ on:
       - 'cake/**'
       - 'nuget/**'
       - '**/*.props'
+      - 'version.txt'
       - 'LadybugDB.slnx'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/release.yml'
   pull_request:
     paths:
       - 'src/**'
@@ -27,8 +29,10 @@ on:
       - 'cake/**'
       - 'nuget/**'
       - '**/*.props'
+      - 'version.txt'
       - 'LadybugDB.slnx'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:

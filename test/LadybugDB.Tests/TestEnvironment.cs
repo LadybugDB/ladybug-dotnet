@@ -9,7 +9,7 @@ internal static class TestEnvironment
 {
     /// <summary>
     /// True when the native Ladybug library can be loaded. When false, tests skip rather than fail.
-    /// See <c>.agents/notes/HANDOFF.md</c> for how to provide the native library.
+    /// See <c>MAINTAINING.md</c> for how to provide the native library.
     /// </summary>
     public static readonly bool NativeAvailable = Probe();
 

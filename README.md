@@ -4,7 +4,7 @@ Official C# binding for the [Ladybug](https://github.com/ladybugdb/ladybug) embe
 It wraps the native Ladybug C API via P/Invoke and ships prebuilt native libraries for supported
 platforms, so you can run Cypher queries against an embedded graph database directly from .NET.
 
-> Status: under construction. See `.agents/notes/ROADMAP.md` for progress.
+> Current package family: `0.17.0.1`, built against the Ladybug `v0.17.0` engine.
 
 ## Target frameworks
 
@@ -76,14 +76,18 @@ project under [`cake/`](cake) (run it with the `build.ps1` / `build.sh` bootstra
 ./build.sh --target Pack     # build the full package family into ./artifacts
 ```
 
-The package version tracks the upstream engine version (e.g. `0.17.0`), with an `-alpha.N` prerelease
-suffix while the binding is in development. It is defined once in `version.txt` at the repo root; override
-it with `--package-version <v>` (the release workflow uses the git tag), or `--prerelease ""` for a stable
-build that matches the engine version.
+All packages in the family share one version. The first three numeric segments track the upstream engine
+release, and the optional fourth segment is the .NET package revision for binding-only releases. For
+example, package `0.17.0.1` wraps the Ladybug `v0.17.0` engine; a future binding-only fix over the same
+engine would be `0.17.0.2`. Prerelease suffixes are reserved for preview builds.
+
+The package version is defined once in `version.txt` at the repo root. Override it with
+`--package-version <v>` (the release workflow uses the git tag). The engine release defaults to the first
+three numeric package-version segments; override with `--engine-version` when needed.
 
 - **`Pack`** stages the prebuilt `liblbug-*` assets for every shipped RID (downloaded from an upstream
-  `LadybugDB/ladybug` GitHub Release, pinned to the engine version from `version.txt`; override with
-  `--engine-version`),
+  `LadybugDB/ladybug` GitHub Release, pinned to the engine version derived from `version.txt`; override
+  with `--engine-version`),
   packs the managed `LadybugDB` package, one `LadybugDB.Native.<rid>` package per RID, and the
   `LadybugDB.Native` meta-package, then verifies every package's contents.
 - **CI / release** (`.github/workflows/`) invoke the same pipeline; the release workflow gates on the

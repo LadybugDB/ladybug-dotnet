@@ -5,14 +5,14 @@ name: Release
 # trusted publishing (OIDC).
 #
 # Native engine libraries are NOT built here; the pipeline downloads prebuilt `liblbug-*` release
-# assets from the upstream engine repo (LadybugDB/ladybug). The engine release defaults to the base
-# of the version being built (the git tag, or version.txt for manual runs).
+# assets from the upstream engine repo (LadybugDB/ladybug). The engine release defaults to the first
+# three numeric segments of the package version (the git tag, or version.txt for manual runs).
 #
 # Triggers:
 #   - push a tag like `v0.1.0`     -> build, test, pack, and PUBLISH all packages to nuget.org
 #   - manual `workflow_dispatch`   -> build, test, and pack only (artifact uploaded; no publish)
 #
-# One-time setup required before the first publish (see notes/HANDOFF.md):
+# One-time setup required before publishing (see MAINTAINING.md):
 #   - nuget.org trusted publishing policy covering every package id: LadybugDB, LadybugDB.Native, and
 #     LadybugDB.Native.{win-x64, linux-x64, linux-arm64, osx-x64, osx-arm64}
 #     (owner=LadybugDB, repo=ladybug-dotnet, workflow file=release.yml; environment left blank for now)
@@ -29,7 +29,7 @@ on:
         required: false
         default: ''
       engine_version:
-        description: "LadybugDB/ladybug release tag to pull prebuilt native libs from (defaults to the version's base)."
+        description: "LadybugDB/ladybug release tag to pull prebuilt native libs from (defaults to the package version's first three numeric segments)."
         required: false
         default: ''
 
@@ -71,7 +71,13 @@ jobs:
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
           ENGINE="${{ inputs.engine_version }}"
-          ENGINE="${ENGINE:-v${VERSION%%-*}}"   # default: engine release matching the version's base
+          BASE="${VERSION%%[-+]*}"
+          IFS='.' read -r MAJOR MINOR PATCH _ <<< "$BASE"
+          if [[ ! "${MAJOR:-}" =~ ^[0-9]+$ || ! "${MINOR:-}" =~ ^[0-9]+$ || ! "${PATCH:-}" =~ ^[0-9]+$ ]]; then
+            echo "Package version '$VERSION' must start with three numeric engine segments." >&2
+            exit 1
+          fi
+          ENGINE="${ENGINE:-v${MAJOR}.${MINOR}.${PATCH}}"
           echo "engine=$ENGINE" >> "$GITHUB_OUTPUT"
           echo "Pulling native libs from LadybugDB/ladybug release: $ENGINE"
 

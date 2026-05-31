@@ -6,8 +6,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>LadybugDB.Examples.PreparedStatements</RootNamespace>
-    <!-- Tracks version.txt at the repo root. Override with: dotnet run -p:LadybugVersion=<version> -->
-    <LadybugVersion Condition="'$(LadybugVersion)' == ''">0.17.0-alpha.1</LadybugVersion>
   </PropertyGroup>
 
   <ItemGroup>

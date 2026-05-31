@@ -34,20 +34,21 @@ public sealed class BuildContext : FrostingContext
 
         Root = FindBindingRoot();
 
-        // version.txt at the binding root is the single source of truth for the version (e.g.
-        // "0.17.0-alpha.1"): its base drives both the engine release we pull natives from and the
-        // package version's base, and its prerelease suffix (alpha.1, alpha.2, ...) is the dev suffix.
-        // Bump it there - no code change. Overrides: --engine-version / ENGINE_VERSION pick a different
-        // engine release; --prerelease "" cuts a stable build; --package-version sets the version
-        // verbatim (the release workflow passes the git tag). 'version' is reserved by the Cake host.
-        (string baseVersion, string filePrerelease) = ReadVersion(Root);
-        EngineVersion = context.Argument("engine-version",
-            Environment.GetEnvironmentVariable("ENGINE_VERSION") ?? $"v{baseVersion}");
+        // version.txt at the binding root is the single source of truth for the package family version
+        // (e.g. "0.17.0.1"). The first three numeric segments identify the upstream engine release
+        // (v0.17.0), while an optional fourth segment identifies a binding-only package revision.
+        // Overrides: --engine-version / ENGINE_VERSION pick a different engine release; --prerelease
+        // can add or replace a prerelease suffix; --package-version sets the package version verbatim
+        // (the release workflow passes the git tag). 'version' is reserved by the Cake host.
+        string fileVersion = ReadVersion(Root);
+        string versionBase = StripVersionSuffixes(fileVersion);
+        string filePrerelease = GetPrereleaseSuffix(fileVersion);
         string prerelease = context.Argument("prerelease", filePrerelease);
-        string engineBase = EngineVersion.TrimStart('v', 'V');
         Version = context.HasArgument("package-version")
             ? context.Argument<string>("package-version")
-            : prerelease.Length == 0 ? engineBase : $"{engineBase}-{prerelease}";
+            : prerelease.Length == 0 ? versionBase : $"{versionBase}-{prerelease}";
+        EngineVersion = context.Argument("engine-version",
+            Environment.GetEnvironmentVariable("ENGINE_VERSION") ?? $"v{DeriveEngineVersion(Version)}");
 
         ManagedProject = Path.Combine(Root, "src", "LadybugDB", "LadybugDB.csproj");
         TestProject = Path.Combine(Root, "test", "LadybugDB.Tests", "LadybugDB.Tests.csproj");
@@ -211,23 +212,55 @@ public sealed class BuildContext : FrostingContext
     }
 
     /// <summary>
-    /// Reads the binding's version from <c>version.txt</c> at the root - the single source of truth for
-    /// the package version (e.g. "0.17.0-alpha.1"). Returns the base ("0.17.0") and the prerelease
-    /// suffix ("alpha.1", or "" when stable). Bump it there to advance the alpha or the engine; no code change.
+    /// Reads the binding package-family version from <c>version.txt</c> at the root. The first three
+    /// numeric segments track the native engine release, and an optional fourth segment tracks a
+    /// binding-only package revision.
     /// </summary>
-    private static (string Base, string Prerelease) ReadVersion(string root)
+    private static string ReadVersion(string root)
     {
         string path = Path.Combine(root, "version.txt");
         if (!File.Exists(path))
         {
             throw new CakeException(
                 $"Version file not found at '{path}'. " +
-                $"It is the single source of truth for the package version (e.g. 0.17.0-alpha.1).");
+                $"It is the single source of truth for the package version (e.g. 0.17.0.1).");
         }
 
-        string raw = File.ReadAllText(path).Trim();
-        int dash = raw.IndexOf('-');
-        return dash < 0 ? (raw, string.Empty) : (raw[..dash], raw[(dash + 1)..]);
+        return File.ReadAllText(path).Trim();
+    }
+
+    private static string DeriveEngineVersion(string packageVersion)
+    {
+        string baseVersion = StripVersionSuffixes(packageVersion);
+        string[] parts = baseVersion.Split('.');
+        if (parts.Length < 3 || parts.Take(3).Any(p => p.Length == 0 || !p.All(char.IsDigit)))
+        {
+            throw new CakeException(
+                $"Package version '{packageVersion}' must start with three numeric engine segments, " +
+                "for example 0.17.0 or 0.17.0.1.");
+        }
+
+        return string.Join(".", parts.Take(3));
+    }
+
+    private static string StripVersionSuffixes(string version)
+    {
+        int dash = version.IndexOf('-');
+        int plus = version.IndexOf('+');
+        int suffix = dash < 0 ? plus : plus < 0 ? dash : Math.Min(dash, plus);
+        return suffix < 0 ? version : version[..suffix];
+    }
+
+    private static string GetPrereleaseSuffix(string version)
+    {
+        int dash = version.IndexOf('-');
+        if (dash < 0)
+        {
+            return string.Empty;
+        }
+
+        int plus = version.IndexOf('+', dash + 1);
+        return plus < 0 ? version[(dash + 1)..] : version[(dash + 1)..plus];
     }
 
     private static string FindBindingRoot()

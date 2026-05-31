@@ -2,7 +2,7 @@
 
   <!-- NuGet package metadata + native runtime packing. Imported by the packable project. -->
   <PropertyGroup>
-    <!-- Single source of truth: version.txt at the binding root (e.g. 0.17.0-alpha.1). The cake/
+    <!-- Single source of truth: version.txt at the binding root (e.g. 0.17.0.1). The cake/
          pipeline reads the same file; this default only applies to a direct `dotnet pack`. -->
     <Version Condition="'$(Version)' == ''">$([System.IO.File]::ReadAllText('$(CSharpDir)version.txt').Trim())</Version>
     <Authors>LadybugDB</Authors>

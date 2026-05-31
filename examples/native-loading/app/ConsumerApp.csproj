@@ -8,15 +8,14 @@
       - Scenario 2 (system):  published with the default (IncludeNative unset) so the
         app carries ONLY the managed assembly and must find liblbug.so on the system.
 
-    LadybugVersion defaults to the value in ../../../version.txt; the Dockerfiles pass it
-    explicitly via -p:LadybugVersion=<v> so the example is not pinned to one string.
+    LadybugVersion defaults in examples/Directory.Build.props; the Dockerfiles pass it
+    explicitly via -p:LadybugVersion=<v> so the example restores the staged local packages.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <AssemblyName>ConsumerApp</AssemblyName>
-    <LadybugVersion Condition="'$(LadybugVersion)' == ''">0.17.0-alpha.1</LadybugVersion>
   </PropertyGroup>
 
   <ItemGroup>
