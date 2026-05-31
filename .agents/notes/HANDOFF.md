@@ -125,12 +125,12 @@ Both workflows invoke the Cake pipeline via `dotnet run --project cake/LadybugDB
 - `.github/workflows/ci.yml` - PR/push validation, path-filtered to `src/**`, `test/**`, `cake/**`,
   `nuget/**`, `**/*.props`, `LadybugDB.slnx`. A `test` matrix (linux-x64 + win-x64) runs `--target Test`
   (stages the host native, runs the suite with no skips), and a `pack` job runs `--target Pack`
-  (`--package-version 0.0.0-ci`) to build + verify the whole family without publishing.
+  (version derived from `version.txt`) to build + verify the whole family without publishing.
 - `.github/workflows/release.yml` - the release pipeline. Two jobs:
   1. `pack`: resolves the version (tag `v1.2.3` -> `1.2.3`) and engine version, runs `--target Test`
      as the linux-x64 gate against the real engine, then `--target Pack` (which stages all 5 RIDs, packs
      the 7 packages, and `VerifyPackages` asserts every package's contents). Uploads the artifacts.
-  2. `publish` (only on `v*` tags, `environment: release`): trusted publishing via `NuGet/login@v1`
+  2. `publish` (only on `v*` tags): trusted publishing via `NuGet/login@v1`
      (`id-token: write`) + `dotnet nuget push "artifacts/*.nupkg" --skip-duplicate` - now pushes ALL 7
      packages (the `.snupkg` symbols ride along with the managed package).
 - The upstream engine release the natives are taken from defaults to the version's base (from
@@ -148,10 +148,12 @@ use it to dry-run the full family build before tagging.
 ### One-time setup before the first publish (MAINTAINER ACTION)
 - nuget.org -> Account -> Trusted Publishing -> Add a policy for EACH package id (the publish job pushes
   all 7): `LadybugDB`, `LadybugDB.Native`, and `LadybugDB.Native.{win-x64, linux-x64, linux-arm64,
-  osx-x64, osx-arm64}`. owner=`LadybugDB`, repo=`ladybug-dotnet`, workflow file=`release.yml`,
-  environment=`release` for each.
-- Repo Settings -> Environments -> `release`: add secret `NUGET_USER` = the nuget.org PROFILE name
-  (not email) that owns/co-owns the package ids. Optionally add required reviewers as an approval gate.
+  osx-x64, osx-arm64}`. owner=`LadybugDB`, repo=`ladybug-dotnet`, workflow file=`release.yml`; leave the
+  policy's Environment blank for now (the publish job runs without a GitHub environment).
+- Repo Settings -> Secrets and variables -> Actions: add repository secret `NUGET_USER` = the nuget.org
+  PROFILE name (not email) that owns/co-owns the package ids. (DONE.) A dedicated `release` environment
+  (required reviewers as an approval gate, with the policy's Environment set to match) can be added later
+  when we separate release vs test environments.
 - All 7 package ids must be owned (or reserved) by that nuget.org account before the first real push;
   until then, use `workflow_dispatch` / local `./build.ps1 --target Pack` as a dry run.
 
@@ -159,7 +161,7 @@ use it to dry-run the full family build before tagging.
 1. Local end-to-end is DONE (2026-05-30): `--target Pack` built + verified all 7 packages and
    `--target Test` passed 28/28 against the engine `v0.17.0` natives on win-x64. Next, run `release.yml`
    via `workflow_dispatch` once to confirm the same on CI (the linux-x64 gate + all-RID download/pack).
-2. Complete the nuget.org trusted-publishing policies (one per package id) + `release` environment, then
+2. Complete the nuget.org trusted-publishing policies (one per package id, Environment blank), then
    tag `v*`.
 3. Reserve/own all 7 package ids on nuget.org under the publishing account (the repo already lives in the
    LadybugDB org).
