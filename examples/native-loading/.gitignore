@@ -1,0 +1,4 @@
+feed/
+logs/
+**/bin/
+**/obj/
