@@ -11,6 +11,15 @@ As of 2026-05-30 the binding was split into a standalone repo - now adopted into
 only). The suite still passes 28/28 from the submodule, building `lbug_shared` against the parent engine
 via `../../`.
 
+As of 2026-05-31 the first package-family release, `v0.17.0-alpha.1`, was published to NuGet: `LadybugDB`,
+`LadybugDB.Native`, and all five per-RID native packages.
+
+Also as of 2026-05-31, four database-usage examples were added under `examples/` (quickstart, demo-graph,
+prepared-statements, result-values) as package consumers of the published NuGet feed. All four build and
+run green on win-x64 against `v0.17.0-alpha.1`. The only issue surfaced was an example-formatter
+assumption, not a binding bug: a `MAP` materializes to `Dictionary<object, object?>` while a `STRUCT`
+materializes to `Dictionary<string, object?>` (now documented).
+
 ## Phase 0 - Scaffold  [x]
 - [x] `tools/csharp_api/` layout
 - [x] `.agents/notes/` living docs (DECISIONS, HANDOFF, ROADMAP)
@@ -39,7 +48,7 @@ via `../../`.
 - [x] P/Invoke review pass vs `dotnet-pinvoke` skill: signatures/strings/ownership/`bool` all clean, 0 SYSLIB warnings
 - [x] ABI guard tests (`StructLayoutTests`, 17) assert struct sizes/offsets without needing the native lib
 
-## Phase 4 - Packaging + release  [in progress]
+## Phase 4 - Packaging + release  [x]
 - [x] Local native build recipe + `scripts/build-native-and-test.ps1` (win-x64, MSVC + Ninja)
 - [x] win-x64 native lib wired into `lib/runtimes/win-x64/native/` and loaded by the tests
 - [x] Repo split: standalone `LadybugDB/ladybug-dotnet` (in the LadybugDB org), wired as the `tools/csharp_api` submodule (local)
@@ -54,10 +63,12 @@ via `../../`.
       verified all 7 packages (correct layouts, meta deps, no stray references); `--target Test` 28/28.
 - [x] CI/release rewired to drive the pipeline (`dotnet run --project cake/... -- --target Test|Pack`);
       release `publish` pushes all 7 packages via OIDC; `ci.yml` runs the `test` matrix + a `pack` job.
-- [ ] One-time nuget.org trusted-publishing policy (one per package id) + `release` environment / `NUGET_USER` secret (maintainer action)
-- [ ] First green release run on CI (`workflow_dispatch` to confirm the linux-x64 gate + all-RID download/pack)
-- [ ] Ownership/reservation of all 7 package ids on nuget.org before a real publish
+- [x] One-time nuget.org trusted-publishing policy (one per package id) + `NUGET_USER` secret completed
+- [x] First green release run on CI: `v0.17.0-alpha.1` tag built, tested, packed, and published all 7 packages
+- [x] Ownership/reservation of all 7 package ids on nuget.org before the first real publish
 - [ ] Optional: win-arm64 / linux-musl RIDs (not produced by the upstream precompiled workflow today)
+- [x] Database-usage examples under `examples/` (quickstart, demo-graph, prepared-statements,
+      result-values) as NuGet package consumers; verified green on win-x64 (2026-05-31)
 
 ## Phase 5 (optional) - Extras  [pending]
 - Native AOT validation, Arrow C Data interface, observability metrics.

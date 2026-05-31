@@ -192,6 +192,14 @@ Keep this updated whenever a decision is made.
   `--engine-version` / `ENGINE_VERSION` survive only as optional per-run overrides. The old `0.0.0-dev`
   / `0.0.1-alpha` placeholders are gone.
 
+## D20 - First package-family release published
+- On 2026-05-31 the first published package-family release was cut from tag `v0.17.0-alpha.1`.
+  `release.yml` completed successfully: it gated on linux-x64 against the real engine, packed and verified
+  the family, then published all 7 NuGet package ids via trusted publishing.
+- Published ids: `LadybugDB`, `LadybugDB.Native`, and `LadybugDB.Native.{win-x64, linux-x64, linux-arm64,
+  osx-x64, osx-arm64}`. This closes the Phase 4 build/package-publication track; future release work is
+  normal version bump + tag flow unless the native ABI or package layout changes.
+
 ## Open (decide later)
 - Timestamp representation: `DateTime` (UTC) for non-tz precisions vs `DateTimeOffset` for `TIMESTAMP_TZ` (Phase 2).
 - Whether to expose write-side construction of unsigned / `UNION` / `ARRAY` values and full `INTERVAL` (months/days).

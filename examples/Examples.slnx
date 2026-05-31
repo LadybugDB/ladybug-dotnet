@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="quickstart/Quickstart.csproj" />
+  <Project Path="demo-graph/DemoGraph.csproj" />
+  <Project Path="prepared-statements/PreparedStatements.csproj" />
+  <Project Path="result-values/ResultValues.csproj" />
+</Solution>

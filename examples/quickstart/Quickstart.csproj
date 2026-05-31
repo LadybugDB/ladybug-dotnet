@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>LadybugDB.Examples.Quickstart</RootNamespace>
+    <!-- Tracks version.txt at the repo root. Override with: dotnet run -p:LadybugVersion=<version> -->
+    <LadybugVersion Condition="'$(LadybugVersion)' == ''">0.17.0-alpha.1</LadybugVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LadybugDB" Version="$(LadybugVersion)" />
+    <!-- All-platform native engine. For a slim single-RID app, drop this and reference one runtime, e.g.:
+         <PackageReference Include="LadybugDB.Native.win-x64" Version="$(LadybugVersion)" /> -->
+    <PackageReference Include="LadybugDB.Native" Version="$(LadybugVersion)" />
+  </ItemGroup>
+
+</Project>
