@@ -71,6 +71,9 @@ Use the `build.ps1` / `build.sh` bootstrap from `tools/csharp_api`:
   `LadybugDB` = `lib/net10.0` + `lib/netstandard2.0` (with XML docs) + `README.md`, no `runtimes/` and
   zero dependencies; `LadybugDB.Native.<rid>` = `runtimes/<rid>/native/<lib>` + `lib/netstandard2.0/_._`
   and no dependencies; `LadybugDB.Native` = `_._` + dependencies on all five per-RID packages.
+- RELEASED (2026-05-31): tag `v0.17.0-alpha.1` ran `release.yml` successfully and published all 7
+  packages to NuGet: `LadybugDB`, `LadybugDB.Native`, and `LadybugDB.Native.{win-x64, linux-x64,
+  linux-arm64, osx-x64, osx-arm64}`.
 - Cake arg notes: the package version is `--package-version` (the host reserves `--version`);
   `--engine-version` overrides the pinned engine; `--commit` (or `GITHUB_SHA`) stamps the repository
   metadata. Packages land in `tools/csharp_api/artifacts/` (gitignored).
@@ -118,6 +121,27 @@ tools/csharp_api/
   output, where the DllImport resolver finds it. `lib/` is gitignored, so the DLL is a local artifact.
 - Tests SKIP (not fail) when the native lib is absent (`TestEnvironment.NativeAvailable`).
 
+## Examples (`examples/`)
+Two kinds of samples, kept apart on purpose:
+- Database-usage samples are NuGet package CONSUMERS (they reference `LadybugDB` + `LadybugDB.Native`
+  from the published feed, version pinned via the `LadybugVersion` MSBuild property → `version.txt`):
+  - `quickstart/` - in-memory DB, create/insert/select.
+  - `demo-graph/` - User/City/Follows/LivesIn loaded from VENDORED CSVs under `demo-graph/data/`
+    (copied next to the binary) with `COPY`, then traversed. Self-contained; no `dataset/` dependency.
+  - `prepared-statements/` - prepared-statement reuse + `Connection.Execute(cypher, parameters)`.
+  - `result-values/` - how `QueryResult.Rows()` materializes each engine type into CLR objects.
+- `native-loading/` is a packaging/DEPLOYMENT sample (bundled native NuGet vs. system `.deb`), not a
+  database-usage sample. Left as-is.
+- `examples/README.md` is the index separating the two categories.
+- VERIFIED 2026-05-31 on win-x64 against `v0.17.0-alpha.1`: all four database examples build and run
+  green. The only thing surfaced was an example-formatter assumption (NOT a binding bug): a `MAP`
+  materializes to `Dictionary<object, object?>` while a `STRUCT`/node/rel properties materialize to
+  `Dictionary<string, object?>`. The `result-values` formatter now handles both via non-generic
+  `IDictionary`, and the distinction is documented in its README. Note `LadybugVersion.Version` reports
+  the native engine version (`0.17.0`), which differs from the package version (`0.17.0-alpha.1`).
+- Examples are NOT wired into CI yet (deferred until we settle how examples should behave when
+  `version.txt` is bumped ahead of a published package).
+
 ## CI / CD (GitHub Actions, in the standalone repo)
 Both workflows invoke the Cake pipeline via `dotnet run --project cake/LadybugDB.Build.csproj -- ...`
 (natives come from upstream releases; the engine is never built here). `GH_TOKEN` is set so
@@ -145,7 +169,7 @@ git push origin v0.1.0
 `workflow_dispatch` (with a `version` input) builds + packs + uploads the artifacts WITHOUT publishing -
 use it to dry-run the full family build before tagging.
 
-### One-time setup before the first publish (MAINTAINER ACTION)
+### One-time setup before the first publish (DONE)
 - nuget.org -> Account -> Trusted Publishing -> Add a policy for EACH package id (the publish job pushes
   all 7): `LadybugDB`, `LadybugDB.Native`, and `LadybugDB.Native.{win-x64, linux-x64, linux-arm64,
   osx-x64, osx-arm64}`. owner=`LadybugDB`, repo=`ladybug-dotnet`, workflow file=`release.yml`; leave the
@@ -154,16 +178,13 @@ use it to dry-run the full family build before tagging.
   PROFILE name (not email) that owns/co-owns the package ids. (DONE.) A dedicated `release` environment
   (required reviewers as an approval gate, with the policy's Environment set to match) can be added later
   when we separate release vs test environments.
-- All 7 package ids must be owned (or reserved) by that nuget.org account before the first real push;
-  until then, use `workflow_dispatch` / local `./build.ps1 --target Pack` as a dry run.
+- All 7 package ids are owned/reserved and `v0.17.0-alpha.1` was published successfully.
 
 ## Next steps
-1. Local end-to-end is DONE (2026-05-30): `--target Pack` built + verified all 7 packages and
-   `--target Test` passed 28/28 against the engine `v0.17.0` natives on win-x64. Next, run `release.yml`
-   via `workflow_dispatch` once to confirm the same on CI (the linux-x64 gate + all-RID download/pack).
-2. Complete the nuget.org trusted-publishing policies (one per package id, Environment blank), then
-   tag `v*`.
-3. Reserve/own all 7 package ids on nuget.org under the publishing account (the repo already lives in the
-   LadybugDB org).
-4. Phase 3 (remaining): expand the suite to mirror the Java + C API tests over `dataset/tinysnb`.
-5. Phase 5 (optional): Native AOT validation, Arrow C Data interface, observability.
+1. Keep the release process as-is for follow-up alphas: bump `version.txt` (for example,
+   `0.17.0-alpha.2`), merge through CI, then tag the same version (`v0.17.0-alpha.2`) when ready.
+2. For a new upstream engine release, re-sync managed signatures/struct layouts/enums against that
+   release's `lbug.h`, update ABI tests, bump `version.txt`, and let the Cake pipeline fetch that engine's
+   prebuilt `liblbug-*` assets.
+3. Phase 3 (remaining): expand the suite to mirror the Java + C API tests over `dataset/tinysnb`.
+4. Phase 5 (optional): Native AOT validation, Arrow C Data interface, observability.
