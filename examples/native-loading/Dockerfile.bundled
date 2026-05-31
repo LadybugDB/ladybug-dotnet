@@ -1,0 +1,19 @@
+# Scenario 1 - BUNDLED native.
+# The consumer app references the managed package AND the native NuGet package, so the engine
+# (liblbug.so) is published next to the app and loaded from the app's own deployment directory.
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+ARG LADYBUG_VERSION=0.17.0-alpha.1
+
+WORKDIR /src
+COPY nuget.config ./nuget.config
+COPY feed/ ./feed/
+COPY app/ ./app/
+COPY scripts/ ./scripts/
+
+# Framework-dependent, RID-specific publish. IncludeNative=true pulls in LadybugDB.Native.linux-x64,
+# which flattens runtimes/linux-x64/native/liblbug.so right next to ConsumerApp.dll.
+RUN dotnet publish app/ConsumerApp.csproj -c Release -r linux-x64 --self-contained false \
+        -p:IncludeNative=true -p:LadybugVersion=${LADYBUG_VERSION} -o /app/publish
+
+ENTRYPOINT ["bash", "/src/scripts/run-bundled.sh"]
