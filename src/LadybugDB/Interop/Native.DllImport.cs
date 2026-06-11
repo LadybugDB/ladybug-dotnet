@@ -179,6 +179,12 @@ internal static partial class Native
     internal static LbugState PreparedStatementBindInterval(ref LbugPreparedStatement preparedStatement, string paramName, LbugInterval value)
         => PreparedStatementBindIntervalRaw(ref preparedStatement, ToUtf8(paramName), value);
 
+    [DllImport(LibraryName, EntryPoint = "lbug_prepared_statement_bind_value", CallingConvention = Conv)]
+    private static extern LbugState PreparedStatementBindValueRaw(ref LbugPreparedStatement preparedStatement, byte[] paramName, IntPtr value);
+
+    internal static LbugState PreparedStatementBindValue(ref LbugPreparedStatement preparedStatement, string paramName, IntPtr value)
+        => PreparedStatementBindValueRaw(ref preparedStatement, ToUtf8(paramName), value);
+
     // ---- QueryResult -----------------------------------------------------------------------------
     [DllImport(LibraryName, EntryPoint = "lbug_query_result_destroy", CallingConvention = Conv)]
     internal static extern void QueryResultDestroy(ref LbugQueryResult queryResult);
@@ -223,12 +229,81 @@ internal static partial class Native
     [DllImport(LibraryName, EntryPoint = "lbug_data_type_get_id", CallingConvention = Conv)]
     internal static extern LbugDataTypeId DataTypeGetId(ref LbugLogicalType dataType);
 
+    [DllImport(LibraryName, EntryPoint = "lbug_data_type_create", CallingConvention = Conv)]
+    internal static extern void DataTypeCreate(LbugDataTypeId id, IntPtr childType, ulong numElementsInArray, out LbugLogicalType outType);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_data_type_create", CallingConvention = Conv)]
+    internal static extern void DataTypeCreateWithChild(LbugDataTypeId id, ref LbugLogicalType childType, ulong numElementsInArray, out LbugLogicalType outType);
+
     [DllImport(LibraryName, EntryPoint = "lbug_data_type_destroy", CallingConvention = Conv)]
     internal static extern void DataTypeDestroy(ref LbugLogicalType dataType);
 
     // ---- Value -----------------------------------------------------------------------------------
     [DllImport(LibraryName, EntryPoint = "lbug_value_destroy", CallingConvention = Conv)]
     internal static extern void ValueDestroy(ref LbugValue value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_destroy", CallingConvention = Conv)]
+    internal static extern void ValueDestroy(IntPtr value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_null", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateNull();
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_default", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateDefault(ref LbugLogicalType dataType);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_bool", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateBool([MarshalAs(UnmanagedType.U1)] bool value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_int8", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateInt8(sbyte value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_int16", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateInt16(short value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_int32", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateInt32(int value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_int64", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateInt64(long value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_uint8", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateUInt8(byte value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_uint16", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateUInt16(ushort value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_uint32", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateUInt32(uint value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_uint64", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateUInt64(ulong value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_float", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateFloat(float value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_double", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateDouble(double value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_string", CallingConvention = Conv)]
+    private static extern IntPtr ValueCreateStringRaw(byte[] value);
+
+    internal static IntPtr ValueCreateString(string value)
+        => ValueCreateStringRaw(ToUtf8(value));
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_date", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateDate(LbugDate value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_timestamp", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateTimestamp(LbugTimestamp value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_timestamp_tz", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateTimestampTz(LbugTimestamp value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_interval", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateInterval(LbugInterval value);
+
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_list", CallingConvention = Conv)]
+    internal static extern LbugState ValueCreateList(ulong numElements, [In] IntPtr[] elements, out IntPtr outValue);
 
     [DllImport(LibraryName, EntryPoint = "lbug_value_is_null", CallingConvention = Conv)]
     [return: MarshalAs(UnmanagedType.U1)]

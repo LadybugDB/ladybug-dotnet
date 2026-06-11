@@ -74,6 +74,53 @@ public sealed class PreparedStatementTests
     }
 
     [SkippableFact]
+    public void Execute_with_parameter_dictionary_binds_lists_empty_lists_and_nulls()
+    {
+        Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
+
+        string dbPath = TestEnvironment.NewTempDbPath();
+        try
+        {
+            using var db = new Database(dbPath);
+            using var conn = new Connection(db);
+
+            conn.Query("CREATE NODE TABLE Person(name STRING, PRIMARY KEY(name))").Dispose();
+            conn.Query("CREATE (:Person {name: 'Alice'})").Dispose();
+            conn.Query("CREATE (:Person {name: 'Bob'})").Dispose();
+            conn.Query("CREATE (:Person {name: 'Mallory'})").Dispose();
+
+            var parameters = new Dictionary<string, object?>
+            {
+                ["names"] = new List<string> { "Alice", "Bob" },
+                ["scores"] = new[] { 0.1f, 0.2f },
+                ["empty"] = Array.Empty<string>(),
+                ["missing"] = null
+            };
+            using QueryResult result = conn.Execute(
+                """
+                MATCH (p:Person)
+                WHERE p.name IN $names
+                RETURN collect(p.name) AS names, $scores AS scores, $empty AS empty, $missing AS missing
+                """,
+                parameters);
+
+            object?[] row = result.Rows().Single();
+            var names = Assert.IsType<object?[]>(row[0]);
+            var scores = Assert.IsType<object?[]>(row[1]);
+            var empty = Assert.IsType<object?[]>(row[2]);
+
+            Assert.Equal(new object?[] { "Alice", "Bob" }, names.OrderBy(value => value).ToArray());
+            Assert.Equal(new object?[] { 0.1f, 0.2f }, scores);
+            Assert.Empty(empty);
+            Assert.Null(row[3]);
+        }
+        finally
+        {
+            TestEnvironment.TryDelete(dbPath);
+        }
+    }
+
+    [SkippableFact]
     public void Prepare_failure_throws_query_exception()
     {
         Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
