@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Threading;
 using LadybugDB.Interop;
 
@@ -109,8 +111,7 @@ public sealed class PreparedStatement : IDisposable
     {
         switch (value)
         {
-            case null:
-                throw new ArgumentNullException(nameof(value), "Binding null parameters is not supported.");
+            case null: return BindValue(name, CreateNativeValue(null));
             case bool v: return Bind(name, v);
             case sbyte v: return Bind(name, v);
             case short v: return Bind(name, v);
@@ -130,6 +131,7 @@ public sealed class PreparedStatement : IDisposable
 #if NET7_0_OR_GREATER
             case DateOnly v: return Bind(name, v);
 #endif
+            case IEnumerable v: return BindValue(name, CreateNativeValue(v));
             default:
                 throw new NotSupportedException($"Cannot bind a parameter of type {value.GetType()}.");
         }
@@ -167,6 +169,254 @@ public sealed class PreparedStatement : IDisposable
         => value.Kind == DateTimeKind.Unspecified
             ? DateTime.SpecifyKind(value, DateTimeKind.Utc).Ticks
             : value.ToUniversalTime().Ticks;
+
+    private static IntPtr CreateNativeValue(object? value)
+    {
+        IntPtr handle = value switch
+        {
+            null => Native.ValueCreateNull(),
+            bool v => Native.ValueCreateBool(v),
+            sbyte v => Native.ValueCreateInt8(v),
+            short v => Native.ValueCreateInt16(v),
+            int v => Native.ValueCreateInt32(v),
+            long v => Native.ValueCreateInt64(v),
+            byte v => Native.ValueCreateUInt8(v),
+            ushort v => Native.ValueCreateUInt16(v),
+            uint v => Native.ValueCreateUInt32(v),
+            ulong v => Native.ValueCreateUInt64(v),
+            float v => Native.ValueCreateFloat(v),
+            double v => Native.ValueCreateDouble(v),
+            string v => Native.ValueCreateString(v),
+            Guid v => Native.ValueCreateString(v.ToString()),
+            DateTimeOffset v => Native.ValueCreateTimestampTz(new LbugTimestamp { Value = (v.UtcDateTime.Ticks - UnixEpochTicks) / 10L }),
+            DateTime v => Native.ValueCreateTimestamp(new LbugTimestamp { Value = (ToUtcTicks(v) - UnixEpochTicks) / 10L }),
+            Interval v => Native.ValueCreateInterval(new LbugInterval { Months = v.Months, Days = v.Days, Micros = v.Micros }),
+#if NET7_0_OR_GREATER
+            DateOnly v => Native.ValueCreateDate(new LbugDate { Days = v.DayNumber - new DateOnly(1970, 1, 1).DayNumber }),
+#endif
+            IEnumerable v => CreateNativeList(v),
+            _ => throw new NotSupportedException($"Cannot bind a parameter of type {value.GetType()}.")
+        };
+
+        if (handle == IntPtr.Zero)
+        {
+            throw new LadybugException("Failed to create a native parameter value.");
+        }
+
+        return handle;
+    }
+
+    private static IntPtr CreateNativeList(IEnumerable values)
+    {
+        var elementHandles = new List<IntPtr>();
+        try
+        {
+            foreach (object? value in values)
+            {
+                elementHandles.Add(CreateNativeValue(value));
+            }
+
+            if (elementHandles.Count == 0)
+            {
+                return CreateNativeEmptyList(values.GetType());
+            }
+
+            IntPtr[] elements = elementHandles.ToArray();
+            LbugState state = Native.ValueCreateList((ulong)elements.Length, elements, out IntPtr listHandle);
+            if (state != LbugState.Success || listHandle == IntPtr.Zero)
+            {
+                throw new LadybugException("Failed to create a LIST parameter value.");
+            }
+
+            return listHandle;
+        }
+        finally
+        {
+            foreach (IntPtr handle in elementHandles)
+            {
+                Native.ValueDestroy(handle);
+            }
+        }
+    }
+
+    private static IntPtr CreateNativeEmptyList(Type sequenceType)
+    {
+        if (!TryGetElementDataTypeId(sequenceType, out LbugDataTypeId childTypeId))
+        {
+            throw new NotSupportedException(
+                $"Cannot bind empty enumerable parameter type {sequenceType} because its element type is unknown or unsupported.");
+        }
+
+        Native.DataTypeCreate(childTypeId, IntPtr.Zero, 0, out LbugLogicalType childType);
+        try
+        {
+            Native.DataTypeCreateWithChild(LbugDataTypeId.List, ref childType, 0, out LbugLogicalType listType);
+            try
+            {
+                IntPtr handle = Native.ValueCreateDefault(ref listType);
+                if (handle == IntPtr.Zero)
+                {
+                    throw new LadybugException("Failed to create an empty LIST parameter value.");
+                }
+
+                return handle;
+            }
+            finally
+            {
+                Native.DataTypeDestroy(ref listType);
+            }
+        }
+        finally
+        {
+            Native.DataTypeDestroy(ref childType);
+        }
+    }
+
+    private static bool TryGetElementDataTypeId(Type sequenceType, out LbugDataTypeId dataTypeId)
+    {
+        Type? elementType = GetEnumerableElementType(sequenceType);
+        if (elementType is not null && Nullable.GetUnderlyingType(elementType) is { } nullableType)
+        {
+            elementType = nullableType;
+        }
+
+        if (elementType == typeof(bool))
+        {
+            dataTypeId = LbugDataTypeId.Bool;
+            return true;
+        }
+
+        if (elementType == typeof(sbyte))
+        {
+            dataTypeId = LbugDataTypeId.Int8;
+            return true;
+        }
+
+        if (elementType == typeof(short))
+        {
+            dataTypeId = LbugDataTypeId.Int16;
+            return true;
+        }
+
+        if (elementType == typeof(int))
+        {
+            dataTypeId = LbugDataTypeId.Int32;
+            return true;
+        }
+
+        if (elementType == typeof(long))
+        {
+            dataTypeId = LbugDataTypeId.Int64;
+            return true;
+        }
+
+        if (elementType == typeof(byte))
+        {
+            dataTypeId = LbugDataTypeId.UInt8;
+            return true;
+        }
+
+        if (elementType == typeof(ushort))
+        {
+            dataTypeId = LbugDataTypeId.UInt16;
+            return true;
+        }
+
+        if (elementType == typeof(uint))
+        {
+            dataTypeId = LbugDataTypeId.UInt32;
+            return true;
+        }
+
+        if (elementType == typeof(ulong))
+        {
+            dataTypeId = LbugDataTypeId.UInt64;
+            return true;
+        }
+
+        if (elementType == typeof(float))
+        {
+            dataTypeId = LbugDataTypeId.Float;
+            return true;
+        }
+
+        if (elementType == typeof(double))
+        {
+            dataTypeId = LbugDataTypeId.Double;
+            return true;
+        }
+
+        if (elementType == typeof(string) || elementType == typeof(Guid))
+        {
+            dataTypeId = LbugDataTypeId.String;
+            return true;
+        }
+
+        if (elementType == typeof(DateTime))
+        {
+            dataTypeId = LbugDataTypeId.Timestamp;
+            return true;
+        }
+
+        if (elementType == typeof(DateTimeOffset))
+        {
+            dataTypeId = LbugDataTypeId.TimestampTz;
+            return true;
+        }
+
+        if (elementType == typeof(Interval))
+        {
+            dataTypeId = LbugDataTypeId.Interval;
+            return true;
+        }
+
+#if NET7_0_OR_GREATER
+        if (elementType == typeof(DateOnly))
+        {
+            dataTypeId = LbugDataTypeId.Date;
+            return true;
+        }
+#endif
+
+        dataTypeId = default;
+        return false;
+    }
+
+    private static Type? GetEnumerableElementType(Type sequenceType)
+    {
+        if (sequenceType.IsArray)
+        {
+            return sequenceType.GetElementType();
+        }
+
+        if (sequenceType.IsGenericType && sequenceType.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+        {
+            return sequenceType.GetGenericArguments()[0];
+        }
+
+        if (sequenceType.IsGenericType)
+        {
+            Type[] genericArguments = sequenceType.GetGenericArguments();
+            if (genericArguments.Length == 1)
+            {
+                return genericArguments[0];
+            }
+        }
+
+        return null;
+    }
+
+    private PreparedStatement BindValue(string name, IntPtr value)
+    {
+        try
+        {
+            return Do(name, Native.PreparedStatementBindValue(ref _handle, Name(name), value));
+        }
+        finally
+        {
+            Native.ValueDestroy(value);
+        }
+    }
 
     private PreparedStatement Do(string name, LbugState state)
     {

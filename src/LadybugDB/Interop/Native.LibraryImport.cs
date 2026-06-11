@@ -111,6 +111,9 @@ internal static partial class Native
     [LibraryImport(LibraryName, EntryPoint = "lbug_prepared_statement_bind_interval", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial LbugState PreparedStatementBindInterval(ref LbugPreparedStatement preparedStatement, string paramName, LbugInterval value);
 
+    [LibraryImport(LibraryName, EntryPoint = "lbug_prepared_statement_bind_value", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial LbugState PreparedStatementBindValue(ref LbugPreparedStatement preparedStatement, string paramName, IntPtr value);
+
     // ---- QueryResult -----------------------------------------------------------------------------
     [LibraryImport(LibraryName, EntryPoint = "lbug_query_result_destroy")]
     internal static partial void QueryResultDestroy(ref LbugQueryResult queryResult);
@@ -155,12 +158,78 @@ internal static partial class Native
     [LibraryImport(LibraryName, EntryPoint = "lbug_data_type_get_id")]
     internal static partial LbugDataTypeId DataTypeGetId(ref LbugLogicalType dataType);
 
+    [LibraryImport(LibraryName, EntryPoint = "lbug_data_type_create")]
+    internal static partial void DataTypeCreate(LbugDataTypeId id, IntPtr childType, ulong numElementsInArray, out LbugLogicalType outType);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_data_type_create")]
+    internal static partial void DataTypeCreateWithChild(LbugDataTypeId id, ref LbugLogicalType childType, ulong numElementsInArray, out LbugLogicalType outType);
+
     [LibraryImport(LibraryName, EntryPoint = "lbug_data_type_destroy")]
     internal static partial void DataTypeDestroy(ref LbugLogicalType dataType);
 
     // ---- Value -----------------------------------------------------------------------------------
     [LibraryImport(LibraryName, EntryPoint = "lbug_value_destroy")]
     internal static partial void ValueDestroy(ref LbugValue value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_destroy")]
+    internal static partial void ValueDestroy(IntPtr value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_null")]
+    internal static partial IntPtr ValueCreateNull();
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_default")]
+    internal static partial IntPtr ValueCreateDefault(ref LbugLogicalType dataType);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_bool")]
+    internal static partial IntPtr ValueCreateBool([MarshalAs(UnmanagedType.U1)] bool value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_int8")]
+    internal static partial IntPtr ValueCreateInt8(sbyte value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_int16")]
+    internal static partial IntPtr ValueCreateInt16(short value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_int32")]
+    internal static partial IntPtr ValueCreateInt32(int value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_int64")]
+    internal static partial IntPtr ValueCreateInt64(long value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_uint8")]
+    internal static partial IntPtr ValueCreateUInt8(byte value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_uint16")]
+    internal static partial IntPtr ValueCreateUInt16(ushort value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_uint32")]
+    internal static partial IntPtr ValueCreateUInt32(uint value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_uint64")]
+    internal static partial IntPtr ValueCreateUInt64(ulong value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_float")]
+    internal static partial IntPtr ValueCreateFloat(float value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_double")]
+    internal static partial IntPtr ValueCreateDouble(double value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_string", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial IntPtr ValueCreateString(string value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_date")]
+    internal static partial IntPtr ValueCreateDate(LbugDate value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_timestamp")]
+    internal static partial IntPtr ValueCreateTimestamp(LbugTimestamp value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_timestamp_tz")]
+    internal static partial IntPtr ValueCreateTimestampTz(LbugTimestamp value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_interval")]
+    internal static partial IntPtr ValueCreateInterval(LbugInterval value);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_list")]
+    internal static partial LbugState ValueCreateList(ulong numElements, [In] IntPtr[] elements, out IntPtr outValue);
 
     [LibraryImport(LibraryName, EntryPoint = "lbug_value_is_null")]
     [return: MarshalAs(UnmanagedType.U1)]
