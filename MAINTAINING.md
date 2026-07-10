@@ -5,9 +5,10 @@ the development-era working notes.
 
 ## Repository Shape
 
-This repository contains the hand-written C# binding for the native Ladybug C API. It is also used as the
-`tools/csharp_api` submodule inside the main `LadybugDB/ladybug` monorepo, where the engine source and
-`src/include/c_api/lbug.h` are available at `../../`.
+This is the standalone, hand-written C# binding for the native Ladybug C API. It can be mounted locally
+at `tools/csharp_api` inside a `LadybugDB/ladybug` checkout, where the engine source and
+`src/include/c_api/lbug.h` are available at `../../`. The repositories advance independently: a binding
+release pins a published engine tag rather than a parent-repository submodule commit.
 
 Main areas:
 
@@ -102,25 +103,65 @@ dotnet test tools/csharp_api/test/LadybugDB.Tests/LadybugDB.Tests.csproj -c Rele
 PowerShell can mangle unquoted `-D` arguments; pass CMake flags as quoted strings or via an explicit
 PowerShell array when scripting.
 
+## Adopting an Upstream Engine Release
+
+Use a fresh binding worktree so `lib/` and `download/` cannot contain a native or release archive from
+the previous engine. Set `LADYBUG_ENGINE_REPO` to a local `LadybugDB/ladybug` checkout, then fetch and
+inspect the old and new release tags:
+
+```powershell
+$engine = $env:LADYBUG_ENGINE_REPO
+if (-not $engine -or -not (Test-Path (Join-Path $engine 'src/include/c_api/lbug.h'))) {
+    throw 'Set LADYBUG_ENGINE_REPO to a LadybugDB/ladybug checkout.'
+}
+$old = 'v0.17.0'
+$new = 'v0.18.1'
+
+git -C $engine fetch origin --tags --prune
+gh release view $new --repo LadybugDB/ladybug
+git -C $engine diff --exit-code $old $new -- src/include/c_api/
+git -C $engine log --oneline "$old..$new" -- src/include/c_api/ src/c_api/
+```
+
+The header diff is the ABI gate. An empty diff means no release-driven interop change. A non-empty diff
+requires the ABI checklist below, including updates to both declaration files and native-gated tests.
+Implementation-only changes can still affect behavior, so review the `src/c_api/` log even when the
+header is unchanged.
+
+Confirm that the new release contains every asset named by `cake/BuildContext.cs`:
+
+```powershell
+$required = @(
+    'liblbug-windows-x86_64.zip',
+    'liblbug-linux-x86_64.tar.gz',
+    'liblbug-linux-aarch64.tar.gz',
+    'liblbug-osx-x86_64.tar.gz',
+    'liblbug-osx-arm64.tar.gz'
+)
+$assets = @(gh release view $new --repo LadybugDB/ladybug --json assets --jq '.assets[].name')
+$missing = @($required | Where-Object { $_ -notin $assets })
+if ($missing.Count -ne 0) { throw "Missing release assets: $($missing -join ', ')" }
+```
+
+Set `version.txt` to the exact stable package version, update active version references in the README
+and examples, then validate the real native and the full package family:
+
+```powershell
+.\build.ps1 --target Test --engine-version $new
+.\build.ps1 --target Pack --package-version ($new.TrimStart('v')) --engine-version $new
+```
+
+`Test` must run with native skips disabled. `Pack` must verify the managed package, all five per-RID
+native packages, and the native meta-package. Merge through CI before creating and pushing the matching
+`vX.Y.Z` binding tag; only a tag push publishes to NuGet.
+
 ## Release Flow
 
-1. Decide the package version and update `version.txt`.
-2. Ensure the native engine release exists in `LadybugDB/ladybug` for the first three numeric package
-   version segments, or pass `--engine-version` / workflow `engine_version`.
-3. Run local validation where practical:
-
-   ```powershell
-   ./build.ps1 --target Test
-   ./build.ps1 --target Pack
-   ```
-
+1. Follow **Adopting an Upstream Engine Release** when the first three version segments change.
+2. Update `version.txt`; for a binding-only release, increment only the optional fourth segment.
+3. Run Cake `Test` and `Pack` against the intended engine tag.
 4. Merge through CI.
-5. Tag the package version:
-
-   ```bash
-   git tag v0.17.0.1
-   git push origin v0.17.0.1
-   ```
+5. Tag the merged package version and push that tag; the tag-triggered workflow publishes.
 
 The release workflow gates on linux-x64 against the real engine, packs the full package family, verifies
 contents, and publishes all packages to NuGet through trusted publishing.
