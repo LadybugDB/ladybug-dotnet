@@ -3,7 +3,7 @@
 # (liblbug.so) is published next to the app and loaded from the app's own deployment directory.
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
-ARG LADYBUG_VERSION=0.17.0-alpha.1
+ARG LADYBUG_VERSION=0.18.1
 
 WORKDIR /src
 COPY nuget.config ./nuget.config
