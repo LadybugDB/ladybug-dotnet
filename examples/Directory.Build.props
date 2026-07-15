@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- Published package version used by the examples. Override with:
          dotnet run -p:LadybugVersion=<version> -->
-    <LadybugVersion Condition="'$(LadybugVersion)' == ''">0.18.1</LadybugVersion>
+    <LadybugVersion Condition="'$(LadybugVersion)' == ''">0.18.2</LadybugVersion>
   </PropertyGroup>
 
 </Project>
