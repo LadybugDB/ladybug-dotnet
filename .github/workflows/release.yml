@@ -13,8 +13,8 @@ name: Release
 #   - manual `workflow_dispatch`   -> build, test, and pack only (artifact uploaded; no publish)
 #
 # One-time setup required before publishing (see MAINTAINING.md):
-#   - nuget.org trusted publishing policy covering every package id: LadybugDB, LadybugDB.Native, and
-#     LadybugDB.Native.{win-x64, linux-x64, linux-arm64, osx-x64, osx-arm64}
+#   - nuget.org trusted publishing policy owned by the LadybugDB organization (the policy applies to
+#     all packages owned by that organization)
 #     (owner=LadybugDB, repo=ladybug-dotnet, workflow file=release.yml; environment left blank for now)
 #   - repository secret NUGET_USER = your nuget.org profile name (not email)
 

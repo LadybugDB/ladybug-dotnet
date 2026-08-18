@@ -10,7 +10,7 @@ set -euo pipefail
 
 FEED="${1:?feed dir required}"
 OUT="${2:?output dir required}"
-VER="${3:-0.18.2}"
+VER="${3:-0.19.1}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

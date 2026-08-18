@@ -3,7 +3,7 @@
 # installed system-wide via a Debian package; the app must locate it through the OS dynamic linker.
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
-ARG LADYBUG_VERSION=0.18.2
+ARG LADYBUG_VERSION=0.19.1
 
 # unzip: extract liblbug.so from the native nupkg for the .deb. binutils: readelf (SONAME inspection).
 RUN apt-get update \
@@ -21,6 +21,6 @@ RUN dotnet publish app/ConsumerApp.csproj -c Release -r linux-x64 --self-contain
         -p:LadybugVersion=${LADYBUG_VERSION} -o /app/publish
 
 # Build the .deb at image-build time; installation happens at run time (after the negative control).
-RUN bash scripts/build-deb.sh /src/feed /tmp 0.18.2
+RUN bash scripts/build-deb.sh /src/feed /tmp ${LADYBUG_VERSION}
 
 ENTRYPOINT ["bash", "/src/scripts/run-system.sh"]

@@ -114,8 +114,8 @@ $engine = $env:LADYBUG_ENGINE_REPO
 if (-not $engine -or -not (Test-Path (Join-Path $engine 'src/include/c_api/lbug.h'))) {
     throw 'Set LADYBUG_ENGINE_REPO to a LadybugDB/ladybug checkout.'
 }
-$old = 'v0.18.1'
-$new = 'v0.18.2'
+$old = 'v0.18.2'
+$new = 'v0.19.1'
 
 git -C $engine fetch origin --tags --prune
 gh release view $new --repo LadybugDB/ladybug
@@ -165,6 +165,9 @@ native packages, and the native meta-package. Merge through CI before creating a
 
 The release workflow gates on linux-x64 against the real engine, packs the full package family, verifies
 contents, and publishes all packages to NuGet through trusted publishing.
+
+The nuget.org trusted-publishing policy should be owned by the LadybugDB organization. Policies apply
+to every package owned by the selected owner, so package-family members do not need separate policies.
 
 Manual `workflow_dispatch` builds and uploads artifacts without publishing. Use it for dry runs.
 

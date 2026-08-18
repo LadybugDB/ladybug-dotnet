@@ -4,7 +4,7 @@ Official C# binding for the [Ladybug](https://github.com/ladybugdb/ladybug) embe
 It wraps the native Ladybug C API via P/Invoke and ships prebuilt native libraries for supported
 platforms, so you can run Cypher queries against an embedded graph database directly from .NET.
 
-> Current package family: `0.18.2`, built against the Ladybug `v0.18.2` engine.
+> Current package family: `0.19.1`, built against the Ladybug `v0.19.1` engine.
 
 ## Target frameworks
 
@@ -54,6 +54,12 @@ foreach (var row in result.Rows())
 }
 ```
 
+## Inspecting pushed-down SQL
+
+`Connection.GetPushedSql(cypher)` prepares and optimizes a query, then returns the SQL emitted by a
+pushdown-capable table function. It returns `null` when the optimized plan contains no pushed-down SQL
+and throws `LadybugQueryException` with the native diagnostic when the query cannot be analyzed.
+
 ## Building / testing
 
 ```powershell
@@ -78,8 +84,8 @@ project under [`cake/`](cake) (run it with the `build.ps1` / `build.sh` bootstra
 
 All packages in the family share one version. The first three numeric segments track the upstream engine
 release, and the optional fourth segment is the .NET package revision for binding-only releases. For
-example, package `0.18.2` wraps the Ladybug `v0.18.2` engine; a future binding-only fix over the same
-engine would be `0.18.2.1`. Prerelease suffixes are reserved for preview builds.
+example, package `0.19.1` wraps the Ladybug `v0.19.1` engine; a future binding-only fix over the same
+engine would be `0.19.1.1`. Prerelease suffixes are reserved for preview builds.
 
 The package version is defined once in `version.txt` at the repo root. Override it with
 `--package-version <v>` (the release workflow uses the git tag). The engine release defaults to the first
