@@ -105,6 +105,32 @@ public sealed class Connection : IDisposable
         return Execute(statement);
     }
 
+    /// <summary>
+    /// Returns SQL pushed down by a table function in the optimized plan for <paramref name="cypher"/>,
+    /// or <see langword="null"/> when the plan contains no pushdown-capable table function.
+    /// </summary>
+    /// <exception cref="LadybugQueryException">Thrown when the query cannot be prepared or analyzed.</exception>
+    public string? GetPushedSql(string cypher)
+    {
+        if (cypher is null)
+        {
+            throw new ArgumentNullException(nameof(cypher));
+        }
+
+        lock (_gate)
+        {
+            ThrowIfDisposed();
+            LbugState state = Native.ConnectionGetPushedSql(ref _handle, cypher, out IntPtr sql);
+            if (state != LbugState.Success)
+            {
+                string message = Native.GetLastError() ?? "Failed to get pushed-down SQL.";
+                throw new LadybugQueryException(message);
+            }
+
+            return Native.TakeString(sql);
+        }
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {

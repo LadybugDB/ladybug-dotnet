@@ -13,6 +13,9 @@ internal static partial class Native
     [LibraryImport(LibraryName, EntryPoint = "lbug_get_storage_version")]
     internal static partial ulong GetStorageVersion();
 
+    [LibraryImport(LibraryName, EntryPoint = "lbug_get_last_error")]
+    internal static partial IntPtr GetLastErrorPtr();
+
     // ---- Database --------------------------------------------------------------------------------
     [LibraryImport(LibraryName, EntryPoint = "lbug_default_system_config")]
     internal static partial LbugSystemConfig DefaultSystemConfig();
@@ -38,6 +41,9 @@ internal static partial class Native
 
     [LibraryImport(LibraryName, EntryPoint = "lbug_connection_execute")]
     internal static partial LbugState ConnectionExecute(ref LbugConnection connection, ref LbugPreparedStatement preparedStatement, out LbugQueryResult outQueryResult);
+
+    [LibraryImport(LibraryName, EntryPoint = "lbug_connection_get_pushed_sql", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial LbugState ConnectionGetPushedSql(ref LbugConnection connection, string cypherQuery, out IntPtr outSql);
 
     // ---- PreparedStatement -----------------------------------------------------------------------
     [LibraryImport(LibraryName, EntryPoint = "lbug_prepared_statement_destroy")]

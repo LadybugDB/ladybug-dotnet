@@ -57,6 +57,31 @@ public sealed class SmokeTests
     }
 
     [SkippableFact]
+    public void Get_pushed_sql_without_pushdown_returns_null()
+    {
+        Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
+
+        using var db = new Database();
+        using var conn = new Connection(db);
+
+        Assert.Null(conn.GetPushedSql("RETURN 1"));
+    }
+
+    [SkippableFact]
+    public void Get_pushed_sql_failure_throws_native_message()
+    {
+        Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
+
+        using var db = new Database();
+        using var conn = new Connection(db);
+
+        LadybugQueryException ex = Assert.Throws<LadybugQueryException>(
+            () => conn.GetPushedSql("THIS IS NOT VALID CYPHER"));
+
+        Assert.Contains("exception", ex.Message.ToLowerInvariant());
+    }
+
+    [SkippableFact]
     public void Failed_query_throws_with_message()
     {
         Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
