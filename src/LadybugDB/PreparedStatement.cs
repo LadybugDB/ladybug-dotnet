@@ -83,6 +83,17 @@ public sealed class PreparedStatement : IDisposable
 
     public PreparedStatement Bind(string name, Guid value) => Bind(name, value.ToString());
 
+    /// <summary>Binds a byte array as a BLOB.</summary>
+    public PreparedStatement Bind(string name, byte[] value)
+    {
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+
+        return BindValue(name, CreateNativeValue(value));
+    }
+
     public PreparedStatement Bind(string name, DateTime value)
     {
         long micros = (ToUtcTicks(value) - UnixEpochTicks) / 10L;
@@ -125,6 +136,7 @@ public sealed class PreparedStatement : IDisposable
             case double v: return Bind(name, v);
             case string v: return Bind(name, v);
             case Guid v: return Bind(name, v);
+            case byte[] v: return Bind(name, v);
             case DateTimeOffset v: return Bind(name, v);
             case DateTime v: return Bind(name, v);
             case Interval v: return Bind(name, v);
@@ -188,6 +200,7 @@ public sealed class PreparedStatement : IDisposable
             double v => Native.ValueCreateDouble(v),
             string v => Native.ValueCreateString(v),
             Guid v => Native.ValueCreateString(v.ToString()),
+            byte[] v => Native.ValueCreateBlob(v, (ulong)v.Length),
             DateTimeOffset v => Native.ValueCreateTimestampTz(new LbugTimestamp { Value = (v.UtcDateTime.Ticks - UnixEpochTicks) / 10L }),
             DateTime v => Native.ValueCreateTimestamp(new LbugTimestamp { Value = (ToUtcTicks(v) - UnixEpochTicks) / 10L }),
             Interval v => Native.ValueCreateInterval(new LbugInterval { Months = v.Months, Days = v.Days, Micros = v.Micros }),
@@ -349,6 +362,12 @@ public sealed class PreparedStatement : IDisposable
         if (elementType == typeof(string) || elementType == typeof(Guid))
         {
             dataTypeId = LbugDataTypeId.String;
+            return true;
+        }
+
+        if (elementType == typeof(byte[]))
+        {
+            dataTypeId = LbugDataTypeId.Blob;
             return true;
         }
 

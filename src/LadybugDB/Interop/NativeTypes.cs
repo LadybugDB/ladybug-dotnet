@@ -57,8 +57,10 @@ internal enum LbugDataTypeId
 /// Mirror of the C <c>lbug_system_config</c> struct (passed/returned by value).
 /// <para>
 /// The trailing <see cref="ThreadQos"/> field is macOS-only in C; it is included on every
-/// platform so the managed struct is a constant 56 bytes that matches the native ABI everywhere
-/// (on non-Apple platforms it occupies what is otherwise tail padding and is ignored).
+/// platform so one managed struct (72 bytes) serves all of them. On macOS that is exactly
+/// <c>sizeof(lbug_system_config)</c>. Elsewhere the native struct is 64 bytes and ends before
+/// <see cref="ThreadQos"/>: every shipped ABI passes and returns a struct of this size through
+/// caller-owned memory, so the engine never reads or writes the extra trailing 8 bytes.
 /// </para>
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
@@ -75,6 +77,7 @@ internal struct LbugSystemConfig
     public byte EnableChecksums;
     public byte EnableMultiWrites;
     public byte EnableDefaultHashIndex;
+    public ulong PhysicalPlanPoolPerThread;
     public uint ThreadQos;
 }
 

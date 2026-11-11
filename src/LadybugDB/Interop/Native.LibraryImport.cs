@@ -234,6 +234,9 @@ internal static partial class Native
     [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_interval")]
     internal static partial IntPtr ValueCreateInterval(LbugInterval value);
 
+    [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_blob")]
+    internal static partial IntPtr ValueCreateBlob([In] byte[] data, ulong length);
+
     [LibraryImport(LibraryName, EntryPoint = "lbug_value_create_list")]
     internal static partial LbugState ValueCreateList(ulong numElements, [In] IntPtr[] elements, out IntPtr outValue);
 

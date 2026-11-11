@@ -65,8 +65,9 @@ function in **both**.
 `Interop/NativeTypes.cs`.
 - **C `bool` is 1 byte** → `byte` in structs, `[return: MarshalAs(UnmanagedType.U1)] bool` on
 returns. Never the default 4-byte .NET `bool`.
-- `**lbug_system_config` is 56 bytes** — always include the macOS-only trailing `thread_qos` so the
-by-value struct matches the native ABI on every platform.
+- `**lbug_system_config` is 72 bytes managed** — always include the macOS-only trailing `thread_qos`.
+That is the exact native size on macOS; elsewhere the native struct is 64 bytes and the extra tail is
+never touched, because every shipped ABI passes/returns a struct this large through caller-owned memory.
 - **Memory ownership:** `char`* returns are declared `IntPtr`, copied to a managed string, then freed
 via `lbug_destroy_string` (`Native.TakeString`); blobs via `lbug_destroy_blob`. The
 `_is_owned_by_cpp` flag on result/tuple/value structs governs disposal — don't free what C owns.
