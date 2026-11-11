@@ -18,7 +18,7 @@ dotnet run
 Expected output:
 
 ```
-LadybugDB 0.19.1 (storage v43)
+LadybugDB 0.22.3 (storage v49)
 
 name | age
 Alice is 25 years old

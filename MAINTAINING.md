@@ -114,8 +114,8 @@ $engine = $env:LADYBUG_ENGINE_REPO
 if (-not $engine -or -not (Test-Path (Join-Path $engine 'src/include/c_api/lbug.h'))) {
     throw 'Set LADYBUG_ENGINE_REPO to a LadybugDB/ladybug checkout.'
 }
-$old = 'v0.18.2'
-$new = 'v0.19.1'
+$old = 'v0.19.1'
+$new = 'v0.22.3'
 
 git -C $engine fetch origin --tags --prune
 gh release view $new --repo LadybugDB/ladybug

@@ -3,7 +3,7 @@
 # installed system-wide via a Debian package; the app must locate it through the OS dynamic linker.
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
-ARG LADYBUG_VERSION=0.19.1
+ARG LADYBUG_VERSION=0.22.3
 
 # unzip: extract liblbug.so from the native nupkg for the .deb. binutils: readelf (SONAME inspection).
 RUN apt-get update \
