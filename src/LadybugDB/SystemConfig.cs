@@ -41,6 +41,12 @@ public sealed class SystemConfig
     /// <summary>Whether the default hash index is enabled.</summary>
     public bool? EnableDefaultHashIndex { get; set; }
 
+    /// <summary>
+    /// How many reusable cloned physical plans each thread retains per cached prepared statement.
+    /// <c>0</c> disables pooled-plan reuse.
+    /// </summary>
+    public ulong? PhysicalPlanPoolPerThread { get; set; }
+
     internal LbugSystemConfig ToNative()
     {
         LbugSystemConfig config = Native.DefaultSystemConfig();
@@ -98,6 +104,11 @@ public sealed class SystemConfig
         if (EnableDefaultHashIndex is { } enableDefaultHashIndex)
         {
             config.EnableDefaultHashIndex = ToByte(enableDefaultHashIndex);
+        }
+
+        if (PhysicalPlanPoolPerThread is { } physicalPlanPoolPerThread)
+        {
+            config.PhysicalPlanPoolPerThread = physicalPlanPoolPerThread;
         }
 
         return config;

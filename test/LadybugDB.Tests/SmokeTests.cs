@@ -57,6 +57,30 @@ public sealed class SmokeTests
     }
 
     [SkippableFact]
+    public void System_config_reaches_the_engine()
+    {
+        Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
+
+        string dbPath = TestEnvironment.NewTempDbPath();
+
+        try
+        {
+            // The last field of lbug_system_config: the engine only sees this value when the managed
+            // struct layout matches the native one.
+            using var db = new Database(dbPath, new SystemConfig { PhysicalPlanPoolPerThread = 3 });
+            using var conn = new Connection(db);
+
+            using QueryResult result = conn.Query("CALL current_setting('physical_plan_pool_per_thread') RETURN *");
+
+            Assert.Equal("3", Convert.ToString(result.Rows().Single()[0]));
+        }
+        finally
+        {
+            TestEnvironment.TryDelete(dbPath);
+        }
+    }
+
+    [SkippableFact]
     public void Get_pushed_sql_without_pushdown_returns_null()
     {
         Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");

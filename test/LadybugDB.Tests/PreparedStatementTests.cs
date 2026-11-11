@@ -121,6 +121,49 @@ public sealed class PreparedStatementTests
     }
 
     [SkippableFact]
+    public void Byte_arrays_bind_as_blobs()
+    {
+        Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");
+
+        string dbPath = TestEnvironment.NewTempDbPath();
+        try
+        {
+            using var db = new Database(dbPath);
+            using var conn = new Connection(db);
+
+            conn.Query("CREATE NODE TABLE Doc(id INT64, data BLOB, PRIMARY KEY(id))").Dispose();
+
+            byte[] payload = { 0x00, 0x01, 0x7F, 0x80, 0xFF };
+            using (PreparedStatement insert = conn.Prepare("CREATE (:Doc {id: 1, data: $data})"))
+            {
+                insert.Bind("data", payload).Execute().Dispose();
+            }
+
+            var parameters = new Dictionary<string, object?>
+            {
+                ["empty"] = Array.Empty<byte>(),
+                ["blobs"] = new[] { payload },
+                ["noBlobs"] = Array.Empty<byte[]>()
+            };
+            using QueryResult result = conn.Execute(
+                "MATCH (d:Doc) RETURN d.data, $empty, $blobs, $noBlobs",
+                parameters);
+
+            object?[] row = result.Rows().Single();
+            var blobs = Assert.IsType<object?[]>(row[2]);
+
+            Assert.Equal(payload, Assert.IsType<byte[]>(row[0]));
+            Assert.Empty(Assert.IsType<byte[]>(row[1]));
+            Assert.Equal(payload, Assert.IsType<byte[]>(Assert.Single(blobs)));
+            Assert.Empty(Assert.IsType<object?[]>(row[3]));
+        }
+        finally
+        {
+            TestEnvironment.TryDelete(dbPath);
+        }
+    }
+
+    [SkippableFact]
     public void Prepare_failure_throws_query_exception()
     {
         Skip.IfNot(TestEnvironment.NativeAvailable, "Native Ladybug library is not available.");

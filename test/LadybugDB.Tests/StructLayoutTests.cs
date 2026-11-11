@@ -20,7 +20,7 @@ public sealed class StructLayoutTests
     [InlineData(typeof(LbugDate), 4)]          // int32 days
     [InlineData(typeof(LbugTimestamp), 8)]     // int64 value (shared by all precisions)
     [InlineData(typeof(LbugInterval), 16)]     // int32 months + int32 days + int64 micros
-    [InlineData(typeof(LbugSystemConfig), 56)] // matches sizeof(lbug_system_config) on 64-bit ABIs
+    [InlineData(typeof(LbugSystemConfig), 72)] // sizeof(lbug_system_config) on macOS; 64 + unused thread_qos tail elsewhere
     public void FixedSizeStruct_MatchesNativeSize(Type type, int expectedSize)
     {
         Assert.Equal(expectedSize, Marshal.SizeOf(type));
@@ -91,7 +91,8 @@ public sealed class StructLayoutTests
         Assert.Equal(49, Offset(nameof(LbugSystemConfig.EnableChecksums)));
         Assert.Equal(50, Offset(nameof(LbugSystemConfig.EnableMultiWrites)));
         Assert.Equal(51, Offset(nameof(LbugSystemConfig.EnableDefaultHashIndex)));
-        Assert.Equal(52, Offset(nameof(LbugSystemConfig.ThreadQos)));
+        Assert.Equal(56, Offset(nameof(LbugSystemConfig.PhysicalPlanPoolPerThread)));
+        Assert.Equal(64, Offset(nameof(LbugSystemConfig.ThreadQos)));
 
         static int Offset(string field) => (int)Marshal.OffsetOf<LbugSystemConfig>(field);
     }

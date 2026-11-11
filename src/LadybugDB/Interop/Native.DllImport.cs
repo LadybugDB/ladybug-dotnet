@@ -311,6 +311,9 @@ internal static partial class Native
     [DllImport(LibraryName, EntryPoint = "lbug_value_create_interval", CallingConvention = Conv)]
     internal static extern IntPtr ValueCreateInterval(LbugInterval value);
 
+    [DllImport(LibraryName, EntryPoint = "lbug_value_create_blob", CallingConvention = Conv)]
+    internal static extern IntPtr ValueCreateBlob([In] byte[] data, ulong length);
+
     [DllImport(LibraryName, EntryPoint = "lbug_value_create_list", CallingConvention = Conv)]
     internal static extern LbugState ValueCreateList(ulong numElements, [In] IntPtr[] elements, out IntPtr outValue);
 

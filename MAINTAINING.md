@@ -190,8 +190,10 @@ Rules that should not change without deliberate review:
 
 - Calling convention is Cdecl.
 - C `bool` is one byte: use `byte` in structs and `[MarshalAs(UnmanagedType.U1)]` on bool returns.
-- `lbug_system_config` includes the macOS-only trailing `thread_qos` field so the by-value struct layout
-  matches across platforms.
+- `lbug_system_config` includes the macOS-only trailing `thread_qos` field so one by-value struct serves
+  every platform. Since engine `v0.22.0` that field no longer fits in tail padding: the managed struct is
+  72 bytes (the native size on macOS) against 64 native bytes elsewhere, which is safe only because every
+  shipped ABI passes and returns a struct of this size through caller-owned memory.
 - Native strings/blobs are copied to managed memory and then freed with the matching native destroy
   function.
 - Result/tuple/value disposal must respect the native ownership flag.
