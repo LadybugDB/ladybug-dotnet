@@ -23,6 +23,7 @@
     <dependencies>
       <group targetFramework="netstandard2.0">
         <dependency id="LadybugDB.Native.win-x64" version="$version$" include="native" />
+        <dependency id="LadybugDB.Native.win-arm64" version="$version$" include="native" />
         <dependency id="LadybugDB.Native.linux-x64" version="$version$" include="native" />
         <dependency id="LadybugDB.Native.linux-arm64" version="$version$" include="native" />
         <dependency id="LadybugDB.Native.osx-x64" version="$version$" include="native" />

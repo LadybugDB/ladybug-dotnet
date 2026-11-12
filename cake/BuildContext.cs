@@ -21,6 +21,7 @@ public sealed class BuildContext : FrostingContext
         new Dictionary<string, (string, string)>(StringComparer.Ordinal)
         {
             ["win-x64"] = ("liblbug-windows-x86_64.zip", "lbug_shared.dll"),
+            ["win-arm64"] = ("liblbug-windows-arm64.zip", "lbug_shared.dll"),
             ["linux-x64"] = ("liblbug-linux-x86_64.tar.gz", "liblbug.so"),
             ["linux-arm64"] = ("liblbug-linux-aarch64.tar.gz", "liblbug.so"),
             ["osx-x64"] = ("liblbug-osx-x86_64.tar.gz", "liblbug.dylib"),
@@ -81,10 +82,12 @@ public sealed class BuildContext : FrostingContext
 
     public IReadOnlyList<string> AllRids { get; } = [.. NativeAssets.Keys];
 
+    // Follows the running .NET, not the OS: an x64 SDK on an ARM64 machine runs the suite in an
+    // emulated x64 process, which can only load the x64 engine library.
     public string HostRid { get; } =
         (OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux")
         + "-"
-        + (RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "arm64" : "x64");
+        + (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "arm64" : "x64");
 
     /// <summary>Absolute path the native library for <paramref name="rid"/> is staged to.</summary>
     public string StagedLibraryPath(string rid) =>

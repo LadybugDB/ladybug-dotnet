@@ -13,9 +13,10 @@
     <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
   </PropertyGroup>
 
-  <!-- Host OS / architecture detection, mapped to RID conventions (win/linux/osx, x64/arm64). -->
+  <!-- Host OS / architecture detection, mapped to RID conventions (win/linux/osx, x64/arm64). The
+       architecture is that of the running .NET SDK (the test host inherits it), not of the OS. -->
   <PropertyGroup>
-    <TargetArchitecture Condition="'$(TargetArchitecture)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)</TargetArchitecture>
+    <TargetArchitecture Condition="'$(TargetArchitecture)' == ''">$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)</TargetArchitecture>
     <TargetArchitecture>$(TargetArchitecture.ToLowerInvariant())</TargetArchitecture>
 
     <TargetOS Condition="'$(TargetOS)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win</TargetOS>

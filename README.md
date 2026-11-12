@@ -32,9 +32,23 @@ dotnet add package LadybugDB
 dotnet add package LadybugDB.Native.win-x64
 ```
 
-Available native packages: `LadybugDB.Native.win-x64`, `LadybugDB.Native.linux-x64`,
-`LadybugDB.Native.linux-arm64`, `LadybugDB.Native.osx-x64`, `LadybugDB.Native.osx-arm64`. The
-`LadybugDB.Native` meta-package depends on all of them.
+Available native packages: `LadybugDB.Native.win-x64`, `LadybugDB.Native.win-arm64`,
+`LadybugDB.Native.linux-x64`, `LadybugDB.Native.linux-arm64`, `LadybugDB.Native.osx-x64`,
+`LadybugDB.Native.osx-arm64`. The `LadybugDB.Native` meta-package depends on all of them.
+
+### Runtime requirements
+
+The native engine links OpenSSL 3 dynamically and the native packages do not bundle it, so it must be
+installed on the machine that runs your app:
+
+- **Windows:** `libssl-3-x64.dll` and `libcrypto-3-x64.dll` (`-arm64` on ARM64) on the DLL search path,
+  for example from an OpenSSL 3 installer or copied next to your executable, plus the Microsoft Visual
+  C++ Redistributable.
+- **Linux:** the distribution's OpenSSL 3 package (`libssl.so.3`, `libcrypto.so.3`).
+- **macOS:** Homebrew's `openssl@3`.
+
+When one of these is missing, the first database call throws `DllNotFoundException` for `lbug_shared`
+"or one of its dependencies".
 
 ## Quick start
 
