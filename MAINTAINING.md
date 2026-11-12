@@ -27,6 +27,7 @@ All packages in the family share one package version:
 - `LadybugDB`
 - `LadybugDB.Native`
 - `LadybugDB.Native.win-x64`
+- `LadybugDB.Native.win-arm64`
 - `LadybugDB.Native.linux-x64`
 - `LadybugDB.Native.linux-arm64`
 - `LadybugDB.Native.osx-x64`
@@ -133,6 +134,7 @@ Confirm that the new release contains every asset named by `cake/BuildContext.cs
 ```powershell
 $required = @(
     'liblbug-windows-x86_64.zip',
+    'liblbug-windows-arm64.zip',
     'liblbug-linux-x86_64.tar.gz',
     'liblbug-linux-aarch64.tar.gz',
     'liblbug-osx-x86_64.tar.gz',
@@ -151,7 +153,7 @@ and examples, then validate the real native and the full package family:
 .\build.ps1 --target Pack --package-version ($new.TrimStart('v')) --engine-version $new
 ```
 
-`Test` must run with native skips disabled. `Pack` must verify the managed package, all five per-RID
+`Test` must run with native skips disabled. `Pack` must verify the managed package, all six per-RID
 native packages, and the native meta-package. Merge through CI before creating and pushing the matching
 `vX.Y.Z` binding tag; only a tag push publishes to NuGet.
 
@@ -206,7 +208,7 @@ Rules that should not change without deliberate review:
 - `LadybugDB` plus `LadybugDB.Native` for all supported platforms, or
 - `LadybugDB` plus one `LadybugDB.Native.<rid>` package for a slim single-platform app.
 
-The shipped RIDs are `win-x64`, `linux-x64`, `linux-arm64`, `osx-x64`, and `osx-arm64`.
+The shipped RIDs are `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and `osx-arm64`.
 
 ## Examples
 

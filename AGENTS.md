@@ -94,7 +94,7 @@ The binding ships as a **family** of packages, not one fat package: the managed-
 `LadybugDB.Native.<rid>` per RID (carrying just `runtimes/<rid>/native/*` + an empty `_._` lib marker),
 and the `LadybugDB.Native` meta-package that depends on all of them. Consumers reference `LadybugDB`
 plus a native package (the meta for all platforms, or a single RID for a slim app). Shipped RIDs:
-win-x64, linux-x64, linux-arm64, osx-x64, osx-arm64.
+win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64.
 
 A **Cake Frosting** build project under `cake/` drives everything (don't hand-run `dotnet pack`):
 
@@ -112,7 +112,7 @@ A **Cake Frosting** build project under `cake/` drives everything (don't hand-ru
 - `VerifyPackages` asserts the managed assemblies, every per-RID payload, and the meta's dependency set.
 
 The release pipeline (`.github/workflows/release.yml`, tag `v*`) runs `--target Test` (linux-x64 gate
-against the real engine) then `--target Pack`, and publishes all 7 packages via OIDC. The engine release
+against the real engine) then `--target Pack`, and publishes all 8 packages via OIDC. The engine release
 the natives come from defaults to the first three numeric segments of the package version (`version.txt`,
 or the `v*` tag on release). Details + release checklist live in `MAINTAINING.md`.
 
