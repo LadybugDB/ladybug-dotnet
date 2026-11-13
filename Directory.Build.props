@@ -27,7 +27,6 @@
   <!-- Shared paths. -->
   <PropertyGroup>
     <CSharpDir>$(MSBuildThisFileDirectory)</CSharpDir>
-    <RepoRoot>$([System.IO.Path]::GetFullPath('$(CSharpDir)..\..\'))</RepoRoot>
     <NativeLibDir>$(CSharpDir)lib\</NativeLibDir>
     <PackageOutputPath>$(CSharpDir)packages</PackageOutputPath>
   </PropertyGroup>
